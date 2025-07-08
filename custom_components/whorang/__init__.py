@@ -30,6 +30,7 @@ from .const import (
     SERVICE_TEST_OLLAMA_CONNECTION,
     SERVICE_EXPORT_DATA,
     SERVICE_TEST_WEBHOOK,
+    SERVICE_PROCESS_DOORBELL_EVENT,
 )
 from .coordinator import WhoRangDataUpdateCoordinator
 
@@ -339,6 +340,46 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             except Exception as err:
                 _LOGGER.error("Failed to test Ollama connection: %s", err)
 
+    async def process_doorbell_event_service(call) -> None:
+        """Handle process doorbell event service call."""
+        image_url = call.data.get("image_url")
+        ai_message = call.data.get("ai_message")
+        ai_title = call.data.get("ai_title")
+        weather_temp = call.data.get("weather_temp")
+        weather_humidity = call.data.get("weather_humidity")
+        weather_condition = call.data.get("weather_condition")
+        wind_speed = call.data.get("wind_speed")
+        pressure = call.data.get("pressure")
+        
+        if not image_url:
+            _LOGGER.error("Image URL is required for processing doorbell event")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.async_process_doorbell_event(
+                    image_url=image_url,
+                    ai_message=ai_message,
+                    ai_title=ai_title,
+                    weather_temp=weather_temp,
+                    weather_humidity=weather_humidity,
+                    weather_condition=weather_condition,
+                    wind_speed=wind_speed,
+                    pressure=pressure
+                )
+                if success:
+                    _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
+                else:
+                    _LOGGER.error("Failed to process doorbell event with image: %s", image_url)
+            except Exception as err:
+                _LOGGER.error("Error processing doorbell event: %s", err)
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -425,4 +466,20 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         SERVICE_TEST_OLLAMA_CONNECTION,
         test_ollama_connection_service,
         schema=vol.Schema({}),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_PROCESS_DOORBELL_EVENT,
+        process_doorbell_event_service,
+        schema=vol.Schema({
+            vol.Required("image_url"): str,
+            vol.Optional("ai_message"): str,
+            vol.Optional("ai_title"): str,
+            vol.Optional("weather_temp"): vol.Coerce(float),
+            vol.Optional("weather_humidity"): vol.Coerce(int),
+            vol.Optional("weather_condition"): str,
+            vol.Optional("wind_speed"): vol.Coerce(float),
+            vol.Optional("pressure"): vol.Coerce(float),
+        }),
     )

@@ -130,3 +130,77 @@ refresh_ollama_models:
 test_ollama_connection:
   name: Test Ollama Connection
   description: Test connection to the Ollama service and get status information
+
+process_doorbell_event:
+  name: Process Doorbell Event
+  description: Process a complete doorbell event with image and context data (replaces rest_command.doorbell_webhook)
+  fields:
+    image_url:
+      name: Image URL
+      description: URL of the doorbell snapshot image
+      required: true
+      example: "http://192.168.86.162:8123/local/doorbell_snapshot_1749552024.jpg"
+      selector:
+        text:
+    ai_message:
+      name: AI Message
+      description: AI analysis message
+      required: false
+      example: "A person is standing at the front door"
+      selector:
+        text:
+          multiline: true
+    ai_title:
+      name: AI Title
+      description: AI analysis title
+      required: false
+      example: "Visitor Detected"
+      selector:
+        text:
+    weather_temp:
+      name: Weather Temperature
+      description: Current temperature
+      required: false
+      example: 20
+      selector:
+        number:
+          min: -50
+          max: 50
+          unit_of_measurement: "°C"
+    weather_humidity:
+      name: Weather Humidity
+      description: Current humidity percentage
+      required: false
+      example: 50
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    weather_condition:
+      name: Weather Condition
+      description: Current weather condition
+      required: false
+      example: "clear"
+      selector:
+        text:
+    wind_speed:
+      name: Wind Speed
+      description: Current wind speed
+      required: false
+      example: 5
+      selector:
+        number:
+          min: 0
+          max: 200
+          unit_of_measurement: "km/h"
+    pressure:
+      name: Pressure
+      description: Current atmospheric pressure
+      required: false
+      example: 1013
+      selector:
+        number:
+          min: 800
+          max: 1200
+          unit_of_measurement: "hPa"

@@ -448,3 +448,55 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.error("Failed to export data: %s", err)
             return None
+
+    async def async_process_doorbell_event(
+        self,
+        image_url: str,
+        ai_message: Optional[str] = None,
+        ai_title: Optional[str] = None,
+        weather_temp: Optional[float] = None,
+        weather_humidity: Optional[int] = None,
+        weather_condition: Optional[str] = None,
+        wind_speed: Optional[float] = None,
+        pressure: Optional[float] = None,
+    ) -> bool:
+        """Process a complete doorbell event with image and context data."""
+        try:
+            # Build the payload similar to the original rest_command.doorbell_webhook
+            payload = {
+                "image_url": image_url,
+            }
+            
+            # Add AI analysis data if provided
+            if ai_message:
+                payload["ai_message"] = ai_message
+            if ai_title:
+                payload["ai_title"] = ai_title
+                
+            # Add weather data if provided
+            if weather_temp is not None:
+                payload["weather_temp"] = weather_temp
+            if weather_humidity is not None:
+                payload["weather_humidity"] = weather_humidity
+            if weather_condition:
+                payload["weather_condition"] = weather_condition
+            if wind_speed is not None:
+                payload["wind_speed"] = wind_speed
+            if pressure is not None:
+                payload["pressure"] = pressure
+            
+            # Send the doorbell event to the backend
+            success = await self.api_client.process_doorbell_event(payload)
+            
+            if success:
+                # Refresh data after processing event to update entities
+                await self.async_request_refresh()
+                _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
+            else:
+                _LOGGER.error("Failed to process doorbell event with image: %s", image_url)
+                
+            return success
+            
+        except Exception as err:
+            _LOGGER.error("Error processing doorbell event: %s", err)
+            return False

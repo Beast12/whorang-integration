@@ -744,3 +744,28 @@ class WhoRangAPIClient:
                 "connected_clients": 0,
                 "is_online": False,
             }
+
+    async def process_doorbell_event(self, payload: Dict[str, Any]) -> bool:
+        """Process a complete doorbell event with image and context data.
+        
+        This replaces the original rest_command.doorbell_webhook functionality.
+        """
+        try:
+            # Send the doorbell event to the backend webhook endpoint
+            response = await self._request("POST", "/api/webhook", data=payload)
+            
+            # Check if the request was successful
+            success = response.get("success", False) or response.get("status") == "ok"
+            
+            if success:
+                _LOGGER.info("Successfully processed doorbell event with image: %s", 
+                           payload.get("image_url", "unknown"))
+            else:
+                _LOGGER.error("Backend rejected doorbell event: %s", 
+                            response.get("message", "Unknown error"))
+                
+            return success
+            
+        except Exception as err:
+            _LOGGER.error("Failed to process doorbell event: %s", err)
+            return False

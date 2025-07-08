@@ -87,6 +87,7 @@ SERVICE_REFRESH_OLLAMA_MODELS: Final = "refresh_ollama_models"
 SERVICE_TEST_OLLAMA_CONNECTION: Final = "test_ollama_connection"
 SERVICE_EXPORT_DATA: Final = "export_data"
 SERVICE_TEST_WEBHOOK: Final = "test_webhook"
+SERVICE_PROCESS_DOORBELL_EVENT: Final = "process_doorbell_event"
 
 # WebSocket message types
 WS_TYPE_NEW_VISITOR: Final = "new_visitor"
