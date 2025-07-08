@@ -57,6 +57,8 @@ SENSOR_AI_PROVIDER_ACTIVE: Final = "ai_provider_active"
 SENSOR_AI_COST_TODAY: Final = "ai_cost_today"
 SENSOR_AI_RESPONSE_TIME: Final = "ai_response_time"
 SENSOR_KNOWN_FACES_COUNT: Final = "known_faces_count"
+SENSOR_UNKNOWN_FACES: Final = "unknown_faces"
+SENSOR_LATEST_FACE_DETECTION: Final = "latest_face_detection"
 
 # Binary sensor types
 BINARY_SENSOR_DOORBELL: Final = "doorbell"
@@ -88,6 +90,11 @@ SERVICE_TEST_OLLAMA_CONNECTION: Final = "test_ollama_connection"
 SERVICE_EXPORT_DATA: Final = "export_data"
 SERVICE_TEST_WEBHOOK: Final = "test_webhook"
 SERVICE_PROCESS_DOORBELL_EVENT: Final = "process_doorbell_event"
+SERVICE_LABEL_FACE: Final = "label_face"
+SERVICE_CREATE_PERSON_FROM_FACE: Final = "create_person_from_face"
+SERVICE_GET_UNKNOWN_FACES: Final = "get_unknown_faces"
+SERVICE_DELETE_FACE: Final = "delete_face"
+SERVICE_GET_FACE_SIMILARITIES: Final = "get_face_similarities"
 
 # WebSocket message types
 WS_TYPE_NEW_VISITOR: Final = "new_visitor"
@@ -95,6 +102,9 @@ WS_TYPE_CONNECTION_STATUS: Final = "connection_status"
 WS_TYPE_AI_ANALYSIS_COMPLETE: Final = "ai_analysis_complete"
 WS_TYPE_FACE_DETECTION_COMPLETE: Final = "face_detection_complete"
 WS_TYPE_SYSTEM_STATUS: Final = "system_status"
+WS_TYPE_FACE_DETECTED: Final = "face_detected"
+WS_TYPE_UNKNOWN_FACE_FOUND: Final = "unknown_face_found"
+WS_TYPE_FACE_LABELED: Final = "face_labeled"
 
 # AI Providers
 AI_PROVIDERS: Final = [
@@ -127,12 +137,23 @@ ATTR_COST_USD: Final = "cost_usd"
 ATTR_PERSON_NAME: Final = "person_name"
 ATTR_PERSON_ID: Final = "person_id"
 ATTR_IMAGE_URL: Final = "image_url"
+ATTR_FACE_ID: Final = "face_id"
+ATTR_FACE_CROP_PATH: Final = "face_crop_path"
+ATTR_FACE_QUALITY: Final = "face_quality"
+ATTR_UNKNOWN_FACES: Final = "unknown_faces"
+ATTR_KNOWN_FACES: Final = "known_faces"
+ATTR_FACE_DETAILS: Final = "face_details"
+ATTR_REQUIRES_LABELING: Final = "requires_labeling"
+ATTR_SIMILARITY_SCORE: Final = "similarity_score"
 
 # Event types for automation
 EVENT_VISITOR_DETECTED: Final = f"{DOMAIN}_visitor_detected"
 EVENT_KNOWN_VISITOR_DETECTED: Final = f"{DOMAIN}_known_visitor_detected"
 EVENT_AI_ANALYSIS_COMPLETE: Final = f"{DOMAIN}_ai_analysis_complete"
 EVENT_FACE_DETECTION_COMPLETE: Final = f"{DOMAIN}_face_detection_complete"
+EVENT_UNKNOWN_FACE_DETECTED: Final = f"{DOMAIN}_unknown_face_detected"
+EVENT_FACE_LABELED: Final = f"{DOMAIN}_face_labeled"
+EVENT_PERSON_CREATED: Final = f"{DOMAIN}_person_created"
 
 # Error messages
 ERROR_CANNOT_CONNECT: Final = "cannot_connect"

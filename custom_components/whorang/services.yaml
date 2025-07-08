@@ -200,3 +200,138 @@ process_doorbell_event:
       example: "{{ state_attr('weather.forecast_home', 'pressure') | float | default(1013) }}"
       selector:
         text:
+
+# Face Management Services
+
+label_face:
+  name: Label Face
+  description: Assign a name to an unknown face for recognition
+  fields:
+    face_id:
+      name: Face ID
+      description: ID of the face to label
+      required: true
+      example: 8
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    person_name:
+      name: Person Name
+      description: Name to assign to this face
+      required: true
+      example: "John Doe"
+      selector:
+        text:
+
+create_person_from_face:
+  name: Create Person from Face
+  description: Create a new person and assign the face to them
+  fields:
+    face_id:
+      name: Face ID
+      description: ID of the face to use for the new person
+      required: true
+      example: 8
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    person_name:
+      name: Person Name
+      description: Name of the new person
+      required: true
+      example: "Jane Smith"
+      selector:
+        text:
+    description:
+      name: Description
+      description: Optional description of the person
+      required: false
+      example: "Family member"
+      selector:
+        text:
+          multiline: true
+
+get_unknown_faces:
+  name: Get Unknown Faces
+  description: Retrieve and update the list of unknown faces requiring labeling
+  fields:
+    limit:
+      name: Limit
+      description: Maximum number of faces to retrieve
+      required: false
+      default: 50
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 200
+          mode: box
+    quality_threshold:
+      name: Quality Threshold
+      description: Minimum face quality score (0.0 to 1.0)
+      required: false
+      default: 0.0
+      example: 0.6
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.1
+          mode: slider
+
+delete_face:
+  name: Delete Face
+  description: Delete a detected face from the system
+  fields:
+    face_id:
+      name: Face ID
+      description: ID of the face to delete
+      required: true
+      example: 8
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+
+get_face_similarities:
+  name: Get Face Similarities
+  description: Find similar faces to help with labeling decisions
+  fields:
+    face_id:
+      name: Face ID
+      description: ID of the face to find similarities for
+      required: true
+      example: 8
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    threshold:
+      name: Similarity Threshold
+      description: Minimum similarity score (0.0 to 1.0)
+      required: false
+      default: 0.6
+      example: 0.6
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.1
+          mode: slider
+    limit:
+      name: Limit
+      description: Maximum number of similar faces to return
+      required: false
+      default: 10
+      example: 10
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box

@@ -1,0 +1,227 @@
+# WhoRang Face Labeling Automation Examples
+# Add these to your automations.yaml or create separate automation files
+
+# Automation 1: Unknown Face Detection Alert
+- alias: "WhoRang - Unknown Face Detected"
+  description: "Send notification when unknown faces are detected"
+  trigger:
+    - platform: state
+      entity_id: sensor.whorang_unknown_faces
+      to: 
+  condition:
+    - condition: template
+      value_template: "{{ trigger.to_state.state | int > 0 }}"
+    - condition: template
+      value_template: "{{ trigger.to_state.state | int > trigger.from_state.state | int }}"
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "🔍 Unknown Face Detected"
+        message: |
+          {{ states('sensor.whorang_unknown_faces') }} unknown face(s) detected at the door.
+          Latest detection: {{ states('sensor.whorang_latest_face_detection') }}
+          Please label them to improve recognition.
+        data:
+          actions:
+            - action: "LABEL_FACES"
+              title: "Label Faces"
+            - action: "VIEW_DASHBOARD"
+              title: "View Dashboard"
+          image: "{{ state_attr('sensor.whorang_latest_visitor', 'image_url') }}"
+          tag: "unknown_face"
+          group: "whorang_faces"
+
+# Automation 2: Handle Face Labeling Notification Actions
+- alias: "WhoRang - Handle Face Labeling Action"
+  description: "Handle mobile notification actions for face labeling"
+  trigger:
+    - platform: event
+      event_type: mobile_app_notification_action
+      event_data:
+        action: "LABEL_FACES"
+  action:
+    - service: whorang.get_unknown_faces
+      data:
+        limit: 50
+        quality_threshold: 0.6
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "Face Labeling"
+        message: |
+          Open Home Assistant and navigate to the WhoRang Face Management dashboard to label unknown faces.
+          Current unknown faces: {{ states('sensor.whorang_unknown_faces') }}
+
+# Automation 3: Face Successfully Labeled
+- alias: "WhoRang - Face Labeled Successfully"
+  description: "Confirm when a face has been successfully labeled"
+  trigger:
+    - platform: event
+      event_type: whorang_face_labeled
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "✅ Face Labeled"
+        message: |
+          Face {{ trigger.event.data.face_id }} has been labeled as "{{ trigger.event.data.person_name }}".
+          Recognition system updated successfully.
+        data:
+          tag: "face_labeled"
+          group: "whorang_faces"
+
+# Automation 4: New Person Created
+- alias: "WhoRang - New Person Created"
+  description: "Notify when a new person is created from face labeling"
+  trigger:
+    - platform: event
+      event_type: whorang_person_created
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "👤 New Person Added"
+        message: |
+          New person "{{ trigger.event.data.person_name }}" has been created and assigned to face {{ trigger.event.data.face_id }}.
+          {% if trigger.event.data.description %}
+          Description: {{ trigger.event.data.description }}
+          {% endif %}
+        data:
+          tag: "person_created"
+          group: "whorang_faces"
+
+# Automation 5: Welcome Known Visitor (Enhanced with Face Recognition)
+- alias: "WhoRang - Welcome Known Visitor"
+  description: "Welcome known visitors when they are recognized"
+  trigger:
+    - platform: state
+      entity_id: sensor.whorang_latest_visitor
+  condition:
+    - condition: template
+      value_template: "{{ state_attr('sensor.whorang_latest_visitor', 'face_recognized') == true }}"
+    - condition: template
+      value_template: "{{ state_attr('sensor.whorang_latest_face_detection', 'recognized_persons') | length > 0 }}"
+  action:
+    - service: tts.speak  # Replace with your TTS service
+      data:
+        message: |
+          Welcome back, {{ state_attr('sensor.whorang_latest_face_detection', 'recognized_persons')[0] }}!
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "🏠 Known Visitor"
+        message: |
+          {{ state_attr('sensor.whorang_latest_face_detection', 'recognized_persons')[0] }} is at the door.
+        data:
+          image: "{{ state_attr('sensor.whorang_latest_visitor', 'image_url') }}"
+          tag: "known_visitor"
+          group: "whorang_visitors"
+
+# Automation 6: Daily Face Recognition Summary
+- alias: "WhoRang - Daily Face Recognition Summary"
+  description: "Daily summary of face recognition activity"
+  trigger:
+    - platform: time
+      at: "20:00:00"  # 8 PM daily summary
+  condition:
+    - condition: template
+      value_template: "{{ states('sensor.whorang_visitor_count_today') | int > 0 }}"
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "📊 Daily Face Recognition Summary"
+        message: |
+          Today's Activity:
+          • {{ states('sensor.whorang_visitor_count_today') }} visitors detected
+          • {{ states('sensor.whorang_known_faces') }} known faces in system
+          • {{ states('sensor.whorang_unknown_faces') }} unknown faces need labeling
+          
+          {% if states('sensor.whorang_unknown_faces') | int > 0 %}
+          ⚠️ Please label unknown faces to improve recognition accuracy.
+          {% endif %}
+
+# Automation 7: High Quality Unknown Face Priority Alert
+- alias: "WhoRang - High Quality Unknown Face Alert"
+  description: "Priority alert for high-quality unknown faces"
+  trigger:
+    - platform: event
+      event_type: whorang_unknown_face_detected
+  condition:
+    - condition: template
+      value_template: |
+        {% set faces = trigger.event.data.faces %}
+        {% set high_quality_faces = faces | selectattr('quality_score', '>', 0.8) | list %}
+        {{ high_quality_faces | length > 0 }}
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "🎯 High Quality Unknown Face"
+        message: |
+          High-quality unknown face detected! This is an excellent candidate for labeling.
+          Quality score: {{ (trigger.event.data.faces | selectattr('quality_score', '>', 0.8) | first).quality_score }}
+          Face ID: {{ (trigger.event.data.faces | selectattr('quality_score', '>', 0.8) | first).id }}
+        data:
+          actions:
+            - action: "LABEL_HIGH_QUALITY_FACE"
+              title: "Label Now"
+          tag: "high_quality_face"
+          group: "whorang_faces"
+          importance: high
+
+# Automation 8: Automatic Face Similarity Check
+- alias: "WhoRang - Auto Face Similarity Check"
+  description: "Automatically check for similar faces when unknown faces are detected"
+  trigger:
+    - platform: event
+      event_type: whorang_unknown_face_detected
+  condition:
+    - condition: template
+      value_template: "{{ trigger.event.data.faces | length > 0 }}"
+  action:
+    - repeat:
+        for_each: "{{ trigger.event.data.faces }}"
+        sequence:
+          - service: whorang.get_face_similarities
+            data:
+              face_id: "{{ repeat.item.id }}"
+              threshold: 0.7
+              limit: 5
+          - delay: "00:00:02"  # Small delay between API calls
+
+# Script for Manual Face Labeling Workflow
+script:
+  label_face_workflow:
+    alias: "Label Face Workflow"
+    description: "Complete workflow for labeling an unknown face"
+    fields:
+      face_id:
+        description: "ID of the face to label"
+        example: 8
+      person_name:
+        description: "Name to assign to the face"
+        example: "John Doe"
+      create_new_person:
+        description: "Whether to create a new person (true) or use existing (false)"
+        example: true
+    sequence:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ create_new_person | default(false) }}"
+            sequence:
+              - service: whorang.create_person_from_face
+                data:
+                  face_id: "{{ face_id }}"
+                  person_name: "{{ person_name }}"
+                  description: "Created via labeling workflow"
+        default:
+          - service: whorang.label_face
+            data:
+              face_id: "{{ face_id }}"
+              person_name: "{{ person_name }}"
+      - service: notify.mobile_app_your_phone  # Replace with your notification service
+        data:
+          title: "Face Labeling Complete"
+          message: |
+            Face {{ face_id }} has been labeled as "{{ person_name }}".
+            {% if create_new_person | default(false) %}
+            New person created in the system.
+            {% else %}
+            Assigned to existing person.
+            {% endif %}

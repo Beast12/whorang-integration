@@ -32,6 +32,8 @@ from .const import (
     SENSOR_AI_COST_TODAY,
     SENSOR_AI_RESPONSE_TIME,
     SENSOR_KNOWN_FACES_COUNT,
+    SENSOR_UNKNOWN_FACES,
+    SENSOR_LATEST_FACE_DETECTION,
     ATTR_VISITOR_ID,
     ATTR_TIMESTAMP,
     ATTR_AI_MESSAGE,
@@ -46,6 +48,13 @@ from .const import (
     ATTR_AI_PROVIDER,
     ATTR_COST_USD,
     ATTR_IMAGE_URL,
+    ATTR_FACE_ID,
+    ATTR_FACE_CROP_PATH,
+    ATTR_FACE_QUALITY,
+    ATTR_UNKNOWN_FACES,
+    ATTR_KNOWN_FACES,
+    ATTR_FACE_DETAILS,
+    ATTR_REQUIRES_LABELING,
     UNIT_MILLISECONDS,
     UNIT_CURRENCY_USD,
     UNIT_VISITORS,
@@ -80,6 +89,8 @@ async def async_setup_entry(
         WhoRangAICostTodaySensor(coordinator, config_entry),
         WhoRangAIResponseTimeSensor(coordinator, config_entry),
         WhoRangKnownFacesCountSensor(coordinator, config_entry),
+        WhoRangUnknownFacesSensor(coordinator, config_entry),
+        WhoRangLatestFaceDetectionSensor(coordinator, config_entry),
     ]
 
     async_add_entities(entities)
@@ -572,3 +583,195 @@ class WhoRangKnownFacesCountSensor(WhoRangSensorEntity):
                 for person in known_persons
             ]
         }
+
+
+class WhoRangUnknownFacesSensor(WhoRangSensorEntity):
+    """Sensor for unknown faces requiring labeling."""
+
+    def __init__(
+        self,
+        coordinator: WhoRangDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, config_entry, SENSOR_UNKNOWN_FACES)
+        self._attr_name = "Unknown Faces"
+        self._attr_icon = "mdi:face-recognition"
+        self._attr_native_unit_of_measurement = UNIT_FACES
+        self._attr_state_class = STATE_CLASS_TOTAL
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of unknown faces requiring labeling."""
+        # Check coordinator data first (includes WebSocket updates)
+        if self.coordinator.data:
+            unknown_faces = self.coordinator.data.get(ATTR_UNKNOWN_FACES, [])
+            if isinstance(unknown_faces, list):
+                return len(unknown_faces)
+            elif isinstance(unknown_faces, int):
+                return unknown_faces
+        
+        # Fallback to API call
+        try:
+            # This will be populated by the coordinator when it fetches unknown faces
+            return 0
+        except Exception as e:
+            _LOGGER.error("Failed to get unknown faces count: %s", e)
+            return 0
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return unknown faces data as attributes."""
+        attributes = {}
+        
+        # Get unknown faces from coordinator data
+        if self.coordinator.data:
+            unknown_faces = self.coordinator.data.get(ATTR_UNKNOWN_FACES, [])
+            
+            if isinstance(unknown_faces, list):
+                attributes[ATTR_UNKNOWN_FACES] = unknown_faces
+                attributes[ATTR_REQUIRES_LABELING] = len(unknown_faces) > 0
+                
+                # Add summary information
+                if unknown_faces:
+                    attributes["latest_unknown_face"] = unknown_faces[-1] if unknown_faces else None
+                    attributes["oldest_unknown_face"] = unknown_faces[0] if unknown_faces else None
+                    
+                    # Quality statistics
+                    qualities = [face.get(ATTR_FACE_QUALITY, 0) for face in unknown_faces if isinstance(face, dict)]
+                    if qualities:
+                        attributes["avg_quality"] = round(sum(qualities) / len(qualities), 2)
+                        attributes["min_quality"] = min(qualities)
+                        attributes["max_quality"] = max(qualities)
+                
+                # Add face IDs for easy reference
+                face_ids = []
+                for face in unknown_faces:
+                    if isinstance(face, dict) and face.get(ATTR_FACE_ID):
+                        face_ids.append(face[ATTR_FACE_ID])
+                attributes["face_ids"] = face_ids
+            else:
+                attributes[ATTR_REQUIRES_LABELING] = unknown_faces > 0 if isinstance(unknown_faces, int) else False
+        
+        return attributes
+
+
+class WhoRangLatestFaceDetectionSensor(WhoRangSensorEntity):
+    """Sensor for latest face detection results."""
+
+    def __init__(
+        self,
+        coordinator: WhoRangDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, config_entry, SENSOR_LATEST_FACE_DETECTION)
+        self._attr_name = "Latest Face Detection"
+        self._attr_icon = "mdi:face-man"
+
+    @property
+    def native_value(self) -> str:
+        """Return the latest face detection status."""
+        # Check coordinator data first (includes WebSocket updates)
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor", {})
+            faces_detected = latest_visitor.get(ATTR_FACES_DETECTED, 0)
+            
+            if faces_detected == 0:
+                return "No faces detected"
+            elif faces_detected == 1:
+                return "1 face detected"
+            else:
+                return f"{faces_detected} faces detected"
+        
+        # Fallback to API data
+        latest_visitor = self.coordinator.async_get_latest_visitor()
+        if latest_visitor:
+            faces_detected = latest_visitor.get(ATTR_FACES_DETECTED, 0)
+            if faces_detected == 0:
+                return "No faces detected"
+            elif faces_detected == 1:
+                return "1 face detected"
+            else:
+                return f"{faces_detected} faces detected"
+        
+        return "No detection data"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return face detection details."""
+        attributes = {}
+        
+        # Get face detection data from coordinator
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor", {})
+            
+            # Basic face detection info
+            attributes[ATTR_FACES_DETECTED] = latest_visitor.get(ATTR_FACES_DETECTED, 0)
+            attributes[ATTR_TIMESTAMP] = latest_visitor.get(ATTR_TIMESTAMP)
+            attributes[ATTR_VISITOR_ID] = latest_visitor.get(ATTR_VISITOR_ID)
+            attributes[ATTR_IMAGE_URL] = latest_visitor.get(ATTR_IMAGE_URL)
+            
+            # Face details
+            face_details = latest_visitor.get(ATTR_FACE_DETAILS, [])
+            if face_details:
+                attributes[ATTR_FACE_DETAILS] = face_details
+                
+                # Extract face information
+                face_ids = []
+                face_qualities = []
+                face_crops = []
+                
+                for face in face_details:
+                    if isinstance(face, dict):
+                        if face.get(ATTR_FACE_ID):
+                            face_ids.append(face[ATTR_FACE_ID])
+                        if face.get(ATTR_FACE_QUALITY):
+                            face_qualities.append(face[ATTR_FACE_QUALITY])
+                        if face.get(ATTR_FACE_CROP_PATH):
+                            face_crops.append(face[ATTR_FACE_CROP_PATH])
+                
+                attributes["face_ids"] = face_ids
+                attributes["face_qualities"] = face_qualities
+                attributes["face_crop_paths"] = face_crops
+                
+                # Quality statistics
+                if face_qualities:
+                    attributes["avg_face_quality"] = round(sum(face_qualities) / len(face_qualities), 2)
+                    attributes["best_face_quality"] = max(face_qualities)
+                    attributes["worst_face_quality"] = min(face_qualities)
+            
+            # Known vs unknown faces
+            known_faces = latest_visitor.get(ATTR_KNOWN_FACES, [])
+            unknown_faces = latest_visitor.get(ATTR_UNKNOWN_FACES, [])
+            
+            attributes[ATTR_KNOWN_FACES] = known_faces
+            attributes[ATTR_UNKNOWN_FACES] = unknown_faces
+            attributes["known_faces_count"] = len(known_faces) if isinstance(known_faces, list) else 0
+            attributes["unknown_faces_count"] = len(unknown_faces) if isinstance(unknown_faces, list) else 0
+            attributes[ATTR_REQUIRES_LABELING] = len(unknown_faces) > 0 if isinstance(unknown_faces, list) else False
+            
+            # Recognition status
+            if known_faces:
+                recognized_names = []
+                for face in known_faces:
+                    if isinstance(face, dict) and face.get("person_name"):
+                        recognized_names.append(face["person_name"])
+                attributes["recognized_persons"] = recognized_names
+                attributes["face_recognized"] = True
+            else:
+                attributes["face_recognized"] = False
+                attributes["recognized_persons"] = []
+        
+        # Fallback to API data if no coordinator data
+        if not attributes:
+            latest_visitor = self.coordinator.async_get_latest_visitor()
+            if latest_visitor:
+                attributes[ATTR_FACES_DETECTED] = latest_visitor.get(ATTR_FACES_DETECTED, 0)
+                attributes[ATTR_TIMESTAMP] = latest_visitor.get(ATTR_TIMESTAMP)
+                attributes[ATTR_VISITOR_ID] = latest_visitor.get(ATTR_VISITOR_ID)
+                attributes[ATTR_IMAGE_URL] = latest_visitor.get(ATTR_IMAGE_URL)
+                attributes["face_recognized"] = latest_visitor.get("face_recognized", False)
+        
+        return attributes

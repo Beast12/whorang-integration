@@ -32,6 +32,14 @@ from .const import (
     SERVICE_EXPORT_DATA,
     SERVICE_TEST_WEBHOOK,
     SERVICE_PROCESS_DOORBELL_EVENT,
+    SERVICE_LABEL_FACE,
+    SERVICE_CREATE_PERSON_FROM_FACE,
+    SERVICE_GET_UNKNOWN_FACES,
+    SERVICE_DELETE_FACE,
+    SERVICE_GET_FACE_SIMILARITIES,
+    EVENT_FACE_LABELED,
+    EVENT_PERSON_CREATED,
+    EVENT_UNKNOWN_FACE_DETECTED,
 )
 from .coordinator import WhoRangDataUpdateCoordinator
 
@@ -431,6 +439,185 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         
         _LOGGER.info("=== DOORBELL EVENT SERVICE COMPLETED ===")
 
+    # Face Management Services
+
+    async def label_face_service(call) -> None:
+        """Handle label face service call."""
+        face_id = call.data.get("face_id")
+        person_name = call.data.get("person_name")
+        
+        if not face_id or not person_name:
+            _LOGGER.error("Face ID and person name are required for labeling face")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.api_client.label_face_with_name(face_id, person_name)
+                if success:
+                    _LOGGER.info("Successfully labeled face %s as %s", face_id, person_name)
+                    await coordinator.async_request_refresh()
+                    
+                    # Fire event for automations
+                    hass.bus.async_fire(EVENT_FACE_LABELED, {
+                        "face_id": face_id,
+                        "person_name": person_name,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    _LOGGER.error("Failed to label face %s as %s", face_id, person_name)
+                    
+            except Exception as err:
+                _LOGGER.error("Error labeling face %s: %s", face_id, err)
+
+    async def create_person_from_face_service(call) -> None:
+        """Handle create person from face service call."""
+        face_id = call.data.get("face_id")
+        person_name = call.data.get("person_name")
+        description = call.data.get("description", "")
+        
+        if not face_id or not person_name:
+            _LOGGER.error("Face ID and person name are required for creating person from face")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.api_client.create_person_from_face(face_id, person_name, description)
+                if success:
+                    _LOGGER.info("Successfully created person %s from face %s", person_name, face_id)
+                    await coordinator.async_request_refresh()
+                    
+                    # Fire events for automations
+                    hass.bus.async_fire(EVENT_PERSON_CREATED, {
+                        "person_name": person_name,
+                        "description": description,
+                        "face_id": face_id,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    
+                    hass.bus.async_fire(EVENT_FACE_LABELED, {
+                        "face_id": face_id,
+                        "person_name": person_name,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    _LOGGER.error("Failed to create person %s from face %s", person_name, face_id)
+                    
+            except Exception as err:
+                _LOGGER.error("Error creating person from face %s: %s", face_id, err)
+
+    async def get_unknown_faces_service(call) -> None:
+        """Handle get unknown faces service call."""
+        limit = call.data.get("limit", 50)
+        quality_threshold = call.data.get("quality_threshold", 0.0)
+        
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                unknown_faces = await coordinator.api_client.get_unassigned_faces(
+                    limit=limit, 
+                    quality_threshold=quality_threshold
+                )
+                
+                _LOGGER.info("Retrieved %d unknown faces requiring labeling", len(unknown_faces))
+                
+                # Update coordinator data with unknown faces
+                if coordinator.data is None:
+                    coordinator.data = {}
+                coordinator.data["unknown_faces"] = unknown_faces
+                coordinator.async_set_updated_data(coordinator.data)
+                
+                # Fire event for automations
+                if unknown_faces:
+                    hass.bus.async_fire(EVENT_UNKNOWN_FACE_DETECTED, {
+                        "unknown_faces_count": len(unknown_faces),
+                        "faces": unknown_faces,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    
+            except Exception as err:
+                _LOGGER.error("Error getting unknown faces: %s", err)
+
+    async def delete_face_service(call) -> None:
+        """Handle delete face service call."""
+        face_id = call.data.get("face_id")
+        
+        if not face_id:
+            _LOGGER.error("Face ID is required for deleting face")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.api_client.delete_face(face_id)
+                if success:
+                    _LOGGER.info("Successfully deleted face %s", face_id)
+                    await coordinator.async_request_refresh()
+                else:
+                    _LOGGER.error("Failed to delete face %s", face_id)
+                    
+            except Exception as err:
+                _LOGGER.error("Error deleting face %s: %s", face_id, err)
+
+    async def get_face_similarities_service(call) -> None:
+        """Handle get face similarities service call."""
+        face_id = call.data.get("face_id")
+        threshold = call.data.get("threshold", 0.6)
+        limit = call.data.get("limit", 10)
+        
+        if not face_id:
+            _LOGGER.error("Face ID is required for getting face similarities")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                similarities = await coordinator.api_client.get_face_similarities(
+                    face_id, threshold=threshold, limit=limit
+                )
+                
+                _LOGGER.info("Found %d similar faces for face %s", len(similarities), face_id)
+                
+                # Update coordinator data with similarities
+                if coordinator.data is None:
+                    coordinator.data = {}
+                coordinator.data["face_similarities"] = {
+                    "target_face_id": face_id,
+                    "similarities": similarities,
+                    "threshold": threshold,
+                    "timestamp": datetime.now().isoformat()
+                }
+                coordinator.async_set_updated_data(coordinator.data)
+                    
+            except Exception as err:
+                _LOGGER.error("Error getting face similarities for %s: %s", face_id, err)
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -533,5 +720,57 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             vol.Optional("weather_condition"): str,
             vol.Optional("wind_speed"): vol.Any(vol.Coerce(float), str),  # Allow templates
             vol.Optional("pressure"): vol.Any(vol.Coerce(float), str),  # Allow templates
+        }),
+    )
+
+    # Register face management services
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LABEL_FACE,
+        label_face_service,
+        schema=vol.Schema({
+            vol.Required("face_id"): int,
+            vol.Required("person_name"): str,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_PERSON_FROM_FACE,
+        create_person_from_face_service,
+        schema=vol.Schema({
+            vol.Required("face_id"): int,
+            vol.Required("person_name"): str,
+            vol.Optional("description"): str,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_UNKNOWN_FACES,
+        get_unknown_faces_service,
+        schema=vol.Schema({
+            vol.Optional("limit", default=50): vol.All(int, vol.Range(min=1, max=200)),
+            vol.Optional("quality_threshold", default=0.0): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_DELETE_FACE,
+        delete_face_service,
+        schema=vol.Schema({
+            vol.Required("face_id"): int,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GET_FACE_SIMILARITIES,
+        get_face_similarities_service,
+        schema=vol.Schema({
+            vol.Required("face_id"): int,
+            vol.Optional("threshold", default=0.6): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+            vol.Optional("limit", default=10): vol.All(int, vol.Range(min=1, max=50)),
         }),
     )

@@ -775,3 +775,144 @@ class WhoRangAPIClient:
         except Exception as err:
             _LOGGER.error("Failed to process doorbell event: %s", err)
             return False
+
+    # Face Management API Methods
+
+    async def get_unassigned_faces(
+        self, 
+        limit: int = 50, 
+        offset: int = 0, 
+        quality_threshold: float = 0.0
+    ) -> List[Dict[str, Any]]:
+        """Get unknown faces requiring labeling."""
+        try:
+            params = {
+                "limit": limit,
+                "offset": offset,
+                "quality_threshold": quality_threshold
+            }
+            response = await self._request("GET", f"{API_DETECTED_FACES}/unassigned", params=params)
+            return response.get("faces", [])
+        except Exception as e:
+            _LOGGER.error("Failed to get unassigned faces: %s", e)
+            return []
+
+    async def assign_face_to_person(self, face_id: int, person_id: int) -> bool:
+        """Assign a face to an existing person."""
+        try:
+            data = {"personId": person_id}
+            response = await self._request("POST", f"{API_DETECTED_FACES}/{face_id}/assign", data=data)
+            return response.get("success", False) or "message" in response
+        except Exception as e:
+            _LOGGER.error("Failed to assign face %s to person %s: %s", face_id, person_id, e)
+            return False
+
+    async def label_face_with_name(self, face_id: int, person_name: str) -> bool:
+        """Label a face by creating a new person or finding existing one."""
+        try:
+            # First, try to find existing person with this name
+            known_persons = await self.get_known_persons()
+            existing_person = None
+            
+            for person in known_persons:
+                if person.get("name", "").lower() == person_name.lower():
+                    existing_person = person
+                    break
+            
+            if existing_person:
+                # Assign to existing person
+                return await self.assign_face_to_person(face_id, existing_person["id"])
+            else:
+                # Create new person and assign face
+                return await self.create_person_from_face(face_id, person_name)
+                
+        except Exception as e:
+            _LOGGER.error("Failed to label face %s with name %s: %s", face_id, person_name, e)
+            return False
+
+    async def create_person_from_face(self, face_id: int, person_name: str, description: str = "") -> bool:
+        """Create a new person and assign the face to them."""
+        try:
+            # Create the person first
+            person_response = await self.create_person(person_name, description)
+            
+            if person_response.get("success", False):
+                # Get the created person ID
+                person_id = person_response.get("person", {}).get("id")
+                if person_id:
+                    # Assign the face to the new person
+                    return await self.assign_face_to_person(face_id, person_id)
+            
+            return False
+        except Exception as e:
+            _LOGGER.error("Failed to create person from face %s: %s", face_id, e)
+            return False
+
+    async def get_face_similarities(self, face_id: int, threshold: float = 0.6, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get similar faces for labeling suggestions."""
+        try:
+            params = {
+                "threshold": threshold,
+                "limit": limit
+            }
+            response = await self._request("GET", f"{API_DETECTED_FACES}/{face_id}/similarities", params=params)
+            return response.get("similarities", [])
+        except Exception as e:
+            _LOGGER.error("Failed to get face similarities for %s: %s", face_id, e)
+            return []
+
+    async def delete_face(self, face_id: int) -> bool:
+        """Delete a detected face."""
+        try:
+            response = await self._request("DELETE", f"{API_DETECTED_FACES}/{face_id}")
+            return response.get("success", False) or "message" in response
+        except Exception as e:
+            _LOGGER.error("Failed to delete face %s: %s", face_id, e)
+            return False
+
+    async def get_face_stats(self) -> Dict[str, Any]:
+        """Get face detection statistics."""
+        try:
+            response = await self._request("GET", f"{API_DETECTED_FACES}/stats")
+            return response
+        except Exception as e:
+            _LOGGER.error("Failed to get face stats: %s", e)
+            return {
+                "total": 0,
+                "assigned": 0,
+                "unassigned": 0,
+                "qualityDistribution": [],
+                "recentActivity": []
+            }
+
+    async def bulk_assign_faces(self, face_ids: List[int], person_id: int) -> Dict[str, Any]:
+        """Bulk assign multiple faces to a person."""
+        try:
+            data = {
+                "faceIds": face_ids,
+                "personId": person_id
+            }
+            response = await self._request("POST", f"{API_DETECTED_FACES}/bulk-assign", data=data)
+            return response
+        except Exception as e:
+            _LOGGER.error("Failed to bulk assign faces %s to person %s: %s", face_ids, person_id, e)
+            return {"success": False, "error": str(e)}
+
+    async def get_person_faces(self, person_id: int) -> List[Dict[str, Any]]:
+        """Get all faces assigned to a specific person."""
+        try:
+            response = await self._request("GET", f"{API_DETECTED_FACES}/person/{person_id}")
+            return response.get("faces", [])
+        except Exception as e:
+            _LOGGER.error("Failed to get faces for person %s: %s", person_id, e)
+            return []
+
+    async def get_face_image_url(self, face_id: int) -> Optional[str]:
+        """Get the URL for a face crop image."""
+        try:
+            # The backend should provide face crop URLs in the face data
+            # This is a helper method to construct the URL
+            return f"{self.base_url}/api/detected-faces/{face_id}/image"
+        except Exception as e:
+            _LOGGER.error("Failed to get face image URL for %s: %s", face_id, e)
+            return None
