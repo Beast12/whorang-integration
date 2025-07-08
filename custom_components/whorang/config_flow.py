@@ -10,7 +10,7 @@ import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult, FlowResultType
 from homeassistant.exceptions import HomeAssistantError
 
@@ -414,52 +414,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         self.config_entry = config_entry
+        _LOGGER.debug("OptionsFlowHandler initialized for entry: %s", config_entry.entry_id)
 
     async def async_step_init(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
-        """Manage the options."""
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["general", "ai_providers"]
-        )
-
-    async def async_step_general(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
-        """Configure general options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        # Get current options with defaults
-        current_options = self.config_entry.options
-        
-        options_schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_UPDATE_INTERVAL,
-                    default=current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
-                ): vol.All(int, vol.Range(min=10, max=300)),
-                vol.Optional(
-                    CONF_ENABLE_WEBSOCKET,
-                    default=current_options.get(CONF_ENABLE_WEBSOCKET, True),
-                ): bool,
-                vol.Optional(
-                    CONF_ENABLE_COST_TRACKING,
-                    default=current_options.get(CONF_ENABLE_COST_TRACKING, True),
-                ): bool,
-            }
-        )
-
-        return self.async_show_form(
-            step_id="general",
-            data_schema=options_schema,
-        )
-
-    async def async_step_ai_providers(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
-        """Configure AI provider API keys and Ollama settings."""
+        """Manage the options - comprehensive configuration form."""
+        _LOGGER.debug("Options flow init step called with input: %s", user_input)
         errors: Dict[str, str] = {}
         
         if user_input is not None:
@@ -467,15 +428,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             ollama_host = user_input.get(CONF_OLLAMA_HOST, "").strip()
             ollama_port = user_input.get(CONF_OLLAMA_PORT, DEFAULT_OLLAMA_PORT)
             
-            if ollama_host:
+            if ollama_host and ollama_host != "localhost":
                 try:
-                    # Test Ollama connection
                     if not await self._test_ollama_connection(ollama_host, ollama_port):
-                        errors["ollama_host"] = "cannot_connect_ollama"
+                        errors[CONF_OLLAMA_HOST] = "cannot_connect_ollama"
                 except Exception:
-                    errors["ollama_host"] = "invalid_ollama_config"
+                    errors[CONF_OLLAMA_HOST] = "invalid_ollama_config"
             
-            # Update API keys
+            # Collect and validate API keys
             api_keys = {}
             for key in ["openai_api_key", "claude_api_key", "gemini_api_key", "google_cloud_api_key"]:
                 api_key = user_input.get(key, "").strip()
@@ -487,61 +447,97 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors["base"] = "invalid_api_keys"
             
             if not errors:
-                # Update config entry data with new API keys and Ollama config
+                # Update configuration
                 new_data = dict(self.config_entry.data)
+                
+                # Update AI API keys
                 new_data["ai_api_keys"] = api_keys
                 
                 # Update Ollama configuration
                 new_data["ollama_config"] = {
                     "host": ollama_host if ollama_host else DEFAULT_OLLAMA_HOST,
                     "port": ollama_port,
-                    "enabled": bool(ollama_host)
+                    "enabled": bool(ollama_host and ollama_host.strip())
                 }
                 
+                # Update general options
+                new_options = {
+                    CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                    CONF_ENABLE_WEBSOCKET: user_input.get(CONF_ENABLE_WEBSOCKET, True),
+                    CONF_ENABLE_COST_TRACKING: user_input.get(CONF_ENABLE_COST_TRACKING, True),
+                }
+                
+                # Update config entry
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=new_data
+                    self.config_entry, 
+                    data=new_data,
+                    options=new_options
                 )
+                
+                # Trigger coordinator refresh if available
+                if DOMAIN in self.hass.data and self.config_entry.entry_id in self.hass.data[DOMAIN]:
+                    coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
+                    await coordinator.async_request_refresh()
+                
                 return self.async_create_entry(title="", data={})
         
-        # Get current configuration
+        # Get current configuration with defaults
         current_keys = self.config_entry.data.get("ai_api_keys", {})
         current_ollama = self.config_entry.data.get("ollama_config", {})
+        current_options = self.config_entry.options
         
+        # Create comprehensive configuration schema
+        data_schema = vol.Schema({
+            # AI Provider API Keys Section
+            vol.Optional(
+                "openai_api_key", 
+                default=current_keys.get("openai_api_key", "")
+            ): str,
+            vol.Optional(
+                "claude_api_key",
+                default=current_keys.get("claude_api_key", "")
+            ): str,
+            vol.Optional(
+                "gemini_api_key",
+                default=current_keys.get("gemini_api_key", "")
+            ): str,
+            vol.Optional(
+                "google_cloud_api_key",
+                default=current_keys.get("google_cloud_api_key", "")
+            ): str,
+            
+            # Ollama Configuration Section
+            vol.Optional(
+                CONF_OLLAMA_HOST,
+                default=current_ollama.get("host", DEFAULT_OLLAMA_HOST)
+            ): str,
+            vol.Optional(
+                CONF_OLLAMA_PORT,
+                default=current_ollama.get("port", DEFAULT_OLLAMA_PORT)
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            
+            # General Options Section
+            vol.Optional(
+                CONF_UPDATE_INTERVAL,
+                default=current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+            ): vol.All(int, vol.Range(min=10, max=300)),
+            vol.Optional(
+                CONF_ENABLE_WEBSOCKET,
+                default=current_options.get(CONF_ENABLE_WEBSOCKET, True),
+            ): bool,
+            vol.Optional(
+                CONF_ENABLE_COST_TRACKING,
+                default=current_options.get(CONF_ENABLE_COST_TRACKING, True),
+            ): bool,
+        })
+        
+        _LOGGER.debug("Showing comprehensive options form")
         return self.async_show_form(
-            step_id="ai_providers",
-            data_schema=vol.Schema({
-                # AI Provider API Keys
-                vol.Optional(
-                    "openai_api_key", 
-                    default=current_keys.get("openai_api_key", "")
-                ): str,
-                vol.Optional(
-                    "claude_api_key",
-                    default=current_keys.get("claude_api_key", "")
-                ): str,
-                vol.Optional(
-                    "gemini_api_key",
-                    default=current_keys.get("gemini_api_key", "")
-                ): str,
-                vol.Optional(
-                    "google_cloud_api_key",
-                    default=current_keys.get("google_cloud_api_key", "")
-                ): str,
-                
-                # Ollama Configuration
-                vol.Optional(
-                    CONF_OLLAMA_HOST,
-                    default=current_ollama.get("host", DEFAULT_OLLAMA_HOST)
-                ): str,
-                vol.Optional(
-                    CONF_OLLAMA_PORT,
-                    default=current_ollama.get("port", DEFAULT_OLLAMA_PORT)
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-            }),
+            step_id="init",
+            data_schema=data_schema,
             errors=errors,
             description_placeholders={
-                "ollama_note": "Configure Ollama for local AI processing. Leave host empty to disable Ollama.",
-                "api_note": "Leave API key fields empty to disable external providers."
+                "info": "Configure API keys for external AI providers, Ollama settings for local processing, and general integration options."
             }
         )
 
