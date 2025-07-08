@@ -1,6 +1,7 @@
 """Camera platform for WhoRang AI Doorbell integration."""
 from __future__ import annotations
 
+import aiohttp
 import logging
 from typing import Optional
 
@@ -81,50 +82,107 @@ class WhoRangLatestImageCamera(WhoRangCameraEntity):
         self._attr_name = "Latest Image"
         self._attr_icon = "mdi:camera"
         self._cached_image = None
-        self._last_visitor_id = None
+        self._last_image_url = None
+
+    @property
+    def state(self) -> str:
+        """Return the state of the camera."""
+        # Check for latest image from service call or regular visitor data
+        latest_image = self.coordinator.data.get("latest_image", {}) if self.coordinator.data else {}
+        latest_visitor = self.coordinator.data.get("latest_visitor", {}) if self.coordinator.data else {}
+        
+        # Prioritize service call image data
+        image_url = latest_image.get("url") or latest_visitor.get("image_url")
+        
+        if image_url and image_url != self._last_image_url:
+            return "recording"
+        elif image_url:
+            return "idle"
+        else:
+            return "unavailable"
 
     async def async_camera_image(
         self, width: Optional[int] = None, height: Optional[int] = None
     ) -> Optional[bytes]:
         """Return bytes of camera image."""
-        latest_visitor = self.coordinator.async_get_latest_visitor()
-        if not latest_visitor:
-            return self._cached_image
-
-        # Check if we have a new visitor
-        current_visitor_id = latest_visitor.get("visitor_id")
-        if current_visitor_id != self._last_visitor_id:
-            self._last_visitor_id = current_visitor_id
+        try:
+            # Check for latest image from service call first, then regular visitor data
+            latest_image = self.coordinator.data.get("latest_image", {}) if self.coordinator.data else {}
+            latest_visitor = self.coordinator.data.get("latest_visitor", {}) if self.coordinator.data else {}
             
-            # Try to get the latest image from the API
-            try:
-                image_data = await self.coordinator.api_client.get_latest_image()
-                if image_data:
-                    self._cached_image = image_data
-                    _LOGGER.debug("Updated camera image for visitor: %s", current_visitor_id)
-                else:
-                    _LOGGER.warning("No image data received for visitor: %s", current_visitor_id)
-            except Exception as err:
-                _LOGGER.error("Failed to get latest image: %s", err)
-
-        return self._cached_image
+            # Prioritize service call image data
+            image_url = latest_image.get("url") or latest_visitor.get("image_url")
+            
+            if not image_url:
+                _LOGGER.debug("No image URL available in coordinator data")
+                return self._cached_image
+            
+            # If same URL as last time and we have cached image, return it
+            if image_url == self._last_image_url and self._cached_image:
+                _LOGGER.debug("Returning cached image for URL: %s", image_url)
+                return self._cached_image
+            
+            _LOGGER.info("Fetching new image from URL: %s", image_url)
+            
+            # Fetch image from URL
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    image_url,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        image_data = await response.read()
+                        self._cached_image = image_data
+                        self._last_image_url = image_url
+                        _LOGGER.info("Successfully fetched image (%d bytes) from: %s", 
+                                   len(image_data), image_url)
+                        return image_data
+                    else:
+                        _LOGGER.error("Failed to fetch image from %s: HTTP %s", 
+                                    image_url, response.status)
+                        return self._cached_image
+                        
+        except Exception as e:
+            _LOGGER.error("Error fetching camera image from %s: %s", 
+                         image_url if 'image_url' in locals() else 'unknown', e, exc_info=True)
+            return self._cached_image
 
     @property
     def extra_state_attributes(self):
         """Return additional state attributes."""
-        latest_visitor = self.coordinator.async_get_latest_visitor()
-        if not latest_visitor:
+        if not self.coordinator.data:
             return {}
-
-        return {
-            "visitor_id": latest_visitor.get("visitor_id"),
-            "timestamp": latest_visitor.get("timestamp"),
-            "ai_message": latest_visitor.get("ai_message"),
-            "location": latest_visitor.get("location"),
-            "image_url": latest_visitor.get("image_url"),
-            "faces_detected": latest_visitor.get("faces_detected", 0),
-            "objects_detected": latest_visitor.get("objects_detected"),
+            
+        # Get data from both service call and regular visitor data
+        latest_image = self.coordinator.data.get("latest_image", {})
+        latest_visitor = self.coordinator.data.get("latest_visitor", {})
+        last_service_call = self.coordinator.data.get("last_service_call", {})
+        
+        attributes = {
+            "image_url": latest_image.get("url") or latest_visitor.get("image_url"),
+            "timestamp": latest_image.get("timestamp") or latest_visitor.get("timestamp"),
+            "status": latest_image.get("status", "unknown"),
+            "source": latest_image.get("source", "unknown"),
         }
+        
+        # Add visitor data if available
+        if latest_visitor:
+            attributes.update({
+                "visitor_id": latest_visitor.get("visitor_id"),
+                "ai_message": latest_visitor.get("ai_analysis"),
+                "ai_title": latest_visitor.get("ai_title"),
+                "faces_detected": latest_visitor.get("faces_detected", 0),
+                "confidence": latest_visitor.get("confidence", 0),
+            })
+        
+        # Add service call data if available
+        if last_service_call:
+            attributes.update({
+                "last_service_call": last_service_call.get("timestamp"),
+                "service_call_data": last_service_call.get("data", {}),
+            })
+        
+        return attributes
 
     @property
     def available(self) -> bool:
@@ -133,6 +191,6 @@ class WhoRangLatestImageCamera(WhoRangCameraEntity):
         if not self.coordinator.data:
             return False
             
-        system_info = self.coordinator.async_get_system_info()
+        system_info = self.coordinator.data.get("system_info", {})
         health = system_info.get("health", {})
-        return health.get("status") == "healthy"
+        return health.get("status") in ("healthy", "ok") or self.coordinator.last_update_success

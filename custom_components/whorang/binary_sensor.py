@@ -104,6 +104,22 @@ class WhoRangDoorbellBinarySensor(WhoRangBinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return true if doorbell was recently activated."""
+        # Check coordinator data first (for service calls)
+        if self.coordinator.data:
+            doorbell_state = self.coordinator.data.get("doorbell_state", {})
+            last_triggered = doorbell_state.get("last_triggered")
+            
+            if last_triggered:
+                try:
+                    # Consider "on" if triggered within last 30 seconds
+                    trigger_time = datetime.fromisoformat(last_triggered.replace('Z', '+00:00'))
+                    now = datetime.now(trigger_time.tzinfo) if trigger_time.tzinfo else datetime.now()
+                    time_diff = (now - trigger_time).total_seconds()
+                    return time_diff < 30
+                except Exception as e:
+                    _LOGGER.debug("Error parsing doorbell timestamp: %s", e)
+        
+        # Fallback to regular visitor data
         latest_visitor = self.coordinator.async_get_latest_visitor()
         if not latest_visitor:
             return False
@@ -128,16 +144,48 @@ class WhoRangDoorbellBinarySensor(WhoRangBinarySensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
-        latest_visitor = self.coordinator.async_get_latest_visitor()
-        if not latest_visitor:
-            return {}
-
-        return {
-            ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
-            ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
-            ATTR_AI_MESSAGE: latest_visitor.get("ai_message"),
-            ATTR_LOCATION: latest_visitor.get("location"),
-        }
+        attributes = {}
+        
+        # Check coordinator data first (for service calls)
+        if self.coordinator.data:
+            doorbell_state = self.coordinator.data.get("doorbell_state", {})
+            latest_visitor = self.coordinator.data.get("latest_visitor", {})
+            last_service_call = self.coordinator.data.get("last_service_call", {})
+            
+            if doorbell_state:
+                attributes.update({
+                    "last_triggered": doorbell_state.get("last_triggered"),
+                    "is_triggered": doorbell_state.get("is_triggered", False),
+                    "trigger_source": doorbell_state.get("trigger_source", "unknown"),
+                })
+            
+            if latest_visitor:
+                attributes.update({
+                    ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
+                    ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
+                    ATTR_AI_MESSAGE: latest_visitor.get("ai_analysis"),
+                    "ai_title": latest_visitor.get("ai_title"),
+                    "source": latest_visitor.get("source", "unknown"),
+                })
+            
+            if last_service_call:
+                attributes.update({
+                    "last_service_call": last_service_call.get("timestamp"),
+                    "service_call_data": last_service_call.get("data", {}),
+                })
+        
+        # Fallback to regular visitor data if no service call data
+        if not attributes:
+            latest_visitor = self.coordinator.async_get_latest_visitor()
+            if latest_visitor:
+                attributes.update({
+                    ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
+                    ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
+                    ATTR_AI_MESSAGE: latest_visitor.get("ai_message"),
+                    ATTR_LOCATION: latest_visitor.get("location"),
+                })
+        
+        return attributes
 
 
 class WhoRangMotionBinarySensor(WhoRangBinarySensorEntity):

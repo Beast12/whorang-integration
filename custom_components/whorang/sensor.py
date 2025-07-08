@@ -130,32 +130,82 @@ class WhoRangLatestVisitorSensor(WhoRangSensorEntity):
     @property
     def native_value(self) -> Optional[str]:
         """Return the state of the sensor."""
+        # Check coordinator data first (for service calls), then fallback to API data
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor")
+            if latest_visitor:
+                return (latest_visitor.get("visitor_name") or 
+                       latest_visitor.get("ai_title") or 
+                       latest_visitor.get("ai_analysis", "Unknown visitor"))
+        
+        # Fallback to coordinator method for API data
         latest_visitor = self.coordinator.async_get_latest_visitor()
         if latest_visitor:
             return latest_visitor.get("ai_title") or latest_visitor.get("ai_message", "Unknown visitor")
+        
         return "No visitors"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
-        latest_visitor = self.coordinator.async_get_latest_visitor()
-        if not latest_visitor:
-            return {}
-
-        return {
-            ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
-            ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
-            ATTR_AI_MESSAGE: latest_visitor.get("ai_message"),
-            ATTR_AI_TITLE: latest_visitor.get("ai_title"),
-            ATTR_LOCATION: latest_visitor.get("location"),
-            ATTR_WEATHER: latest_visitor.get("weather"),
-            ATTR_DEVICE_NAME: latest_visitor.get("device_name"),
-            ATTR_CONFIDENCE_SCORE: latest_visitor.get("confidence_score"),
-            ATTR_OBJECTS_DETECTED: latest_visitor.get("objects_detected"),
-            ATTR_FACES_DETECTED: latest_visitor.get("faces_detected", 0),
-            ATTR_PROCESSING_TIME: latest_visitor.get("processing_time"),
-            ATTR_IMAGE_URL: latest_visitor.get("image_url"),
-        }
+        attributes = {}
+        
+        # Check coordinator data first (for service calls)
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor")
+            last_service_call = self.coordinator.data.get("last_service_call")
+            
+            if latest_visitor:
+                attributes.update({
+                    ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
+                    ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
+                    ATTR_AI_MESSAGE: latest_visitor.get("ai_analysis"),
+                    ATTR_AI_TITLE: latest_visitor.get("ai_title"),
+                    ATTR_CONFIDENCE_SCORE: latest_visitor.get("confidence"),
+                    ATTR_FACES_DETECTED: latest_visitor.get("faces_detected", 0),
+                    ATTR_IMAGE_URL: latest_visitor.get("image_url"),
+                    "visitor_name": latest_visitor.get("visitor_name"),
+                    "face_recognized": latest_visitor.get("face_recognized", False),
+                    "source": latest_visitor.get("source", "unknown"),
+                })
+                
+                # Add weather data if available
+                weather = latest_visitor.get("weather", {})
+                if weather:
+                    attributes[ATTR_WEATHER] = weather
+                    attributes["weather_temperature"] = weather.get("temperature")
+                    attributes["weather_humidity"] = weather.get("humidity")
+                    attributes["weather_condition"] = weather.get("condition")
+                    attributes["weather_wind_speed"] = weather.get("wind_speed")
+                    attributes["weather_pressure"] = weather.get("pressure")
+            
+            # Add service call information if available
+            if last_service_call:
+                attributes.update({
+                    "last_service_call": last_service_call.get("timestamp"),
+                    "service_call_data": last_service_call.get("data", {}),
+                })
+        
+        # Fallback to coordinator method for API data if no service call data
+        if not attributes:
+            latest_visitor = self.coordinator.async_get_latest_visitor()
+            if latest_visitor:
+                attributes.update({
+                    ATTR_VISITOR_ID: latest_visitor.get("visitor_id"),
+                    ATTR_TIMESTAMP: latest_visitor.get("timestamp"),
+                    ATTR_AI_MESSAGE: latest_visitor.get("ai_message"),
+                    ATTR_AI_TITLE: latest_visitor.get("ai_title"),
+                    ATTR_LOCATION: latest_visitor.get("location"),
+                    ATTR_WEATHER: latest_visitor.get("weather"),
+                    ATTR_DEVICE_NAME: latest_visitor.get("device_name"),
+                    ATTR_CONFIDENCE_SCORE: latest_visitor.get("confidence_score"),
+                    ATTR_OBJECTS_DETECTED: latest_visitor.get("objects_detected"),
+                    ATTR_FACES_DETECTED: latest_visitor.get("faces_detected", 0),
+                    ATTR_PROCESSING_TIME: latest_visitor.get("processing_time"),
+                    ATTR_IMAGE_URL: latest_visitor.get("image_url"),
+                })
+        
+        return attributes
 
 
 class WhoRangVisitorCountTodaySensor(WhoRangSensorEntity):
@@ -176,6 +226,13 @@ class WhoRangVisitorCountTodaySensor(WhoRangSensorEntity):
     @property
     def native_value(self) -> int:
         """Return the state of the sensor."""
+        # Check coordinator data first (includes service call updates)
+        if self.coordinator.data:
+            visitor_stats = self.coordinator.data.get("visitor_stats", {})
+            if visitor_stats.get("today") is not None:
+                return visitor_stats.get("today", 0)
+        
+        # Fallback to system info from API
         system_info = self.coordinator.async_get_system_info()
         stats = system_info.get("stats", {})
         return stats.get("today", 0)

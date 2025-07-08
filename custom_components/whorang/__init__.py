@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Dict
 
 import voluptuous as vol
@@ -342,43 +343,90 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
     async def process_doorbell_event_service(call) -> None:
         """Handle process doorbell event service call."""
+        _LOGGER.info("=== DOORBELL EVENT SERVICE CALLED ===")
+        _LOGGER.info("Service call data: %s", call.data)
+        
+        # Extract and validate service call data
         image_url = call.data.get("image_url")
-        ai_message = call.data.get("ai_message")
-        ai_title = call.data.get("ai_title")
-        weather_temp = call.data.get("weather_temp")
-        weather_humidity = call.data.get("weather_humidity")
-        weather_condition = call.data.get("weather_condition")
-        wind_speed = call.data.get("wind_speed")
-        pressure = call.data.get("pressure")
+        ai_message = call.data.get("ai_message", "")
+        ai_title = call.data.get("ai_title", "")
+        weather_temp = call.data.get("weather_temp", 20)
+        weather_humidity = call.data.get("weather_humidity", 50)
+        weather_condition = call.data.get("weather_condition", "unknown")
+        wind_speed = call.data.get("wind_speed", 0)
+        pressure = call.data.get("pressure", 1013)
         
         if not image_url:
             _LOGGER.error("Image URL is required for processing doorbell event")
             return
             
-        # Get all coordinators
+        # Get coordinators from hass data
+        coordinators_data = hass.data.get(DOMAIN, {})
+        if not coordinators_data:
+            _LOGGER.error("No WhoRang coordinators found in hass data")
+            return
+        
         coordinators = [
-            coordinator for coordinator in hass.data[DOMAIN].values()
+            coordinator for coordinator in coordinators_data.values()
             if isinstance(coordinator, WhoRangDataUpdateCoordinator)
         ]
         
+        if not coordinators:
+            _LOGGER.error("No WhoRangDataUpdateCoordinator instances found")
+            return
+        
+        # Process the doorbell event for each coordinator
         for coordinator in coordinators:
             try:
-                success = await coordinator.async_process_doorbell_event(
-                    image_url=image_url,
-                    ai_message=ai_message,
-                    ai_title=ai_title,
-                    weather_temp=weather_temp,
-                    weather_humidity=weather_humidity,
-                    weather_condition=weather_condition,
-                    wind_speed=wind_speed,
-                    pressure=pressure
-                )
+                _LOGGER.info("Processing doorbell event through coordinator")
+                
+                # Create comprehensive event data
+                event_data = {
+                    "image_url": image_url,
+                    "ai_message": ai_message,
+                    "ai_title": ai_title,
+                    "weather_temp": weather_temp,
+                    "weather_humidity": weather_humidity,
+                    "weather_condition": weather_condition,
+                    "wind_speed": wind_speed,
+                    "pressure": pressure,
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "service_call"
+                }
+                
+                # Process through coordinator
+                success = await coordinator.async_process_doorbell_event(event_data)
+                
                 if success:
                     _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
+                    
+                    # Force immediate coordinator refresh to update all entities
+                    _LOGGER.info("Triggering coordinator refresh to update entities")
+                    await coordinator.async_request_refresh()
+                    
+                    # Fire Home Assistant event for automations
+                    hass.bus.async_fire("whorang_doorbell_event", {
+                        "image_url": image_url,
+                        "ai_message": ai_message,
+                        "ai_title": ai_title,
+                        "weather_data": {
+                            "temperature": weather_temp,
+                            "humidity": weather_humidity,
+                            "condition": weather_condition,
+                            "wind_speed": wind_speed,
+                            "pressure": pressure
+                        },
+                        "timestamp": event_data["timestamp"],
+                        "source": "service_call"
+                    })
+                    
                 else:
                     _LOGGER.error("Failed to process doorbell event with image: %s", image_url)
+                    
             except Exception as err:
-                _LOGGER.error("Error processing doorbell event: %s", err)
+                _LOGGER.error("Error processing doorbell event: %s", err, exc_info=True)
+        
+        _LOGGER.info("=== DOORBELL EVENT SERVICE COMPLETED ===")
 
     # Register services
     hass.services.async_register(

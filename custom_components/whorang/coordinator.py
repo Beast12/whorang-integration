@@ -449,54 +449,107 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Failed to export data: %s", err)
             return None
 
-    async def async_process_doorbell_event(
-        self,
-        image_url: str,
-        ai_message: Optional[str] = None,
-        ai_title: Optional[str] = None,
-        weather_temp: Optional[float] = None,
-        weather_humidity: Optional[int] = None,
-        weather_condition: Optional[str] = None,
-        wind_speed: Optional[float] = None,
-        pressure: Optional[float] = None,
-    ) -> bool:
+    async def async_process_doorbell_event(self, event_data: Dict[str, Any]) -> bool:
         """Process a complete doorbell event with image and context data."""
         try:
-            # Build the payload similar to the original rest_command.doorbell_webhook
-            payload = {
+            _LOGGER.debug("Coordinator processing doorbell event: %s", event_data)
+            
+            # Extract data from event
+            image_url = event_data.get("image_url")
+            if not image_url:
+                _LOGGER.error("Image URL is required for doorbell event")
+                return False
+            
+            # Send event to backend API first
+            success = await self.api_client.process_doorbell_event(event_data)
+            
+            if not success:
+                _LOGGER.error("Backend failed to process doorbell event")
+                return False
+            
+            # Update coordinator data immediately for entity updates
+            current_time = datetime.now()
+            
+            # Create visitor data structure
+            visitor_data = {
+                "visitor_id": f"service_call_{int(current_time.timestamp())}",
+                "visitor_name": "Unknown Visitor",
+                "timestamp": event_data.get("timestamp", current_time.isoformat()),
+                "face_recognized": False,
+                "confidence": 0.8,
+                "ai_analysis": event_data.get("ai_message", "Visitor detected"),
+                "ai_title": event_data.get("ai_title", "Doorbell Event"),
                 "image_url": image_url,
+                "weather": {
+                    "temperature": event_data.get("weather_temp", 20),
+                    "humidity": event_data.get("weather_humidity", 50),
+                    "condition": event_data.get("weather_condition", "unknown"),
+                    "wind_speed": event_data.get("wind_speed", 0),
+                    "pressure": event_data.get("pressure", 1013)
+                },
+                "source": event_data.get("source", "service_call")
             }
             
-            # Add AI analysis data if provided
-            if ai_message:
-                payload["ai_message"] = ai_message
-            if ai_title:
-                payload["ai_title"] = ai_title
-                
-            # Add weather data if provided
-            if weather_temp is not None:
-                payload["weather_temp"] = weather_temp
-            if weather_humidity is not None:
-                payload["weather_humidity"] = weather_humidity
-            if weather_condition:
-                payload["weather_condition"] = weather_condition
-            if wind_speed is not None:
-                payload["wind_speed"] = wind_speed
-            if pressure is not None:
-                payload["pressure"] = pressure
+            # Initialize data if needed
+            if not hasattr(self, 'data') or self.data is None:
+                self.data = {}
             
-            # Send the doorbell event to the backend
-            success = await self.api_client.process_doorbell_event(payload)
+            # Update coordinator data structure for immediate entity updates
+            self.data.update({
+                "latest_visitor": visitor_data,
+                "latest_image": {
+                    "url": image_url,
+                    "timestamp": current_time.isoformat(),
+                    "status": "available",
+                    "source": "service_call"
+                },
+                "doorbell_state": {
+                    "last_triggered": current_time.isoformat(),
+                    "is_triggered": True,
+                    "trigger_source": "service_call"
+                },
+                "last_service_call": {
+                    "timestamp": current_time.isoformat(),
+                    "data": event_data
+                }
+            })
             
-            if success:
-                # Refresh data after processing event to update entities
-                await self.async_request_refresh()
-                _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
-            else:
-                _LOGGER.error("Failed to process doorbell event with image: %s", image_url)
+            # Update visitor statistics
+            today = current_time.date().isoformat()
+            if "visitor_stats" not in self.data:
+                self.data["visitor_stats"] = {}
+            
+            if "today" not in self.data["visitor_stats"] or self.data["visitor_stats"].get("date") != today:
+                self.data["visitor_stats"]["today"] = 0
+                self.data["visitor_stats"]["date"] = today
                 
-            return success
+            self.data["visitor_stats"]["today"] += 1
+            
+            # Update system status
+            if "system_info" not in self.data:
+                self.data["system_info"] = {}
+            
+            self.data["system_info"].update({
+                "last_event": current_time.isoformat(),
+                "processing": False,
+                "last_service_call": current_time.isoformat()
+            })
+            
+            _LOGGER.info("Coordinator data updated successfully for doorbell event")
+            
+            # Trigger immediate coordinator update to notify all entities
+            self.async_set_updated_data(self.data)
+            
+            # Fire Home Assistant event for automations
+            self.hass.bus.async_fire("whorang_visitor_detected", {
+                "visitor_data": visitor_data,
+                "event_source": "service_call",
+                "image_url": image_url
+            })
+            
+            _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
+            return True
             
         except Exception as err:
-            _LOGGER.error("Error processing doorbell event: %s", err)
+            _LOGGER.error("Failed to process doorbell event in coordinator: %s", err, exc_info=True)
             return False
