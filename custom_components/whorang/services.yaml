@@ -157,6 +157,14 @@ process_doorbell_event:
       example: "Visitor Detected"
       selector:
         text:
+    location:
+      name: Location
+      description: Location where the event occurred
+      required: false
+      default: "front_door"
+      example: "front_door"
+      selector:
+        text:
     weather_temp:
       name: Weather Temperature
       description: Current temperature

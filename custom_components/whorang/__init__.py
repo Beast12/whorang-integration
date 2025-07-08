@@ -350,6 +350,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         image_url = call.data.get("image_url")
         ai_message = call.data.get("ai_message", "")
         ai_title = call.data.get("ai_title", "")
+        location = call.data.get("location", "front_door")
         weather_temp = call.data.get("weather_temp", 20)
         weather_humidity = call.data.get("weather_humidity", 50)
         weather_condition = call.data.get("weather_condition", "unknown")
@@ -385,6 +386,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     "image_url": image_url,
                     "ai_message": ai_message,
                     "ai_title": ai_title,
+                    "location": location,
                     "weather_temp": weather_temp,
                     "weather_humidity": weather_humidity,
                     "weather_condition": weather_condition,
@@ -524,6 +526,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             vol.Required("image_url"): str,
             vol.Optional("ai_message"): str,
             vol.Optional("ai_title"): str,
+            vol.Optional("location", default="front_door"): str,
             vol.Optional("weather_temp"): vol.Coerce(float),
             vol.Optional("weather_humidity"): vol.Coerce(int),
             vol.Optional("weather_condition"): str,
