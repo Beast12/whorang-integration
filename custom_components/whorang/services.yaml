@@ -167,48 +167,36 @@ process_doorbell_event:
         text:
     weather_temp:
       name: Weather Temperature
-      description: Current temperature
+      description: Current temperature (supports templates)
       required: false
-      example: 20
+      example: "{{ state_attr('weather.forecast_home', 'temperature') | float | default(20) }}"
       selector:
-        number:
-          min: -50
-          max: 50
-          unit_of_measurement: "°C"
+        text:
     weather_humidity:
       name: Weather Humidity
-      description: Current humidity percentage
+      description: Current humidity percentage (supports templates)
       required: false
-      example: 50
+      example: "{{ state_attr('weather.forecast_home', 'humidity') | int | default(50) }}"
       selector:
-        number:
-          min: 0
-          max: 100
-          unit_of_measurement: "%"
+        text:
     weather_condition:
       name: Weather Condition
-      description: Current weather condition
+      description: Current weather condition (supports templates)
       required: false
-      example: "clear"
+      example: "{{ states('weather.forecast_home') | default('unknown') }}"
       selector:
         text:
     wind_speed:
       name: Wind Speed
-      description: Current wind speed
+      description: Current wind speed (supports templates)
       required: false
-      example: 5
+      example: "{{ state_attr('weather.forecast_home', 'wind_speed') | float | default(0) }}"
       selector:
-        number:
-          min: 0
-          max: 200
-          unit_of_measurement: "km/h"
+        text:
     pressure:
       name: Pressure
-      description: Current atmospheric pressure
+      description: Current atmospheric pressure (supports templates)
       required: false
-      example: 1013
+      example: "{{ state_attr('weather.forecast_home', 'pressure') | float | default(1013) }}"
       selector:
-        number:
-          min: 800
-          max: 1200
-          unit_of_measurement: "hPa"
+        text:

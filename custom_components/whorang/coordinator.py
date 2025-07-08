@@ -687,6 +687,15 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
             # Update coordinator data immediately for entity updates
             current_time = datetime.now()
             
+            # Create weather data structure - ensure it's always a dict
+            weather_data = {
+                "temperature": event_data.get("weather_temp"),
+                "humidity": event_data.get("weather_humidity"),
+                "condition": event_data.get("weather_condition", "unknown"),
+                "wind_speed": event_data.get("wind_speed", 0),
+                "pressure": event_data.get("pressure", 1013)
+            }
+            
             # Create visitor data structure
             visitor_data = {
                 "visitor_id": f"service_call_{int(current_time.timestamp())}",
@@ -697,13 +706,16 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 "ai_analysis": event_data.get("ai_message", "Visitor detected"),
                 "ai_title": event_data.get("ai_title", "Doorbell Event"),
                 "image_url": image_url,
-                "weather": {
-                    "temperature": event_data.get("weather_temp", 20),
-                    "humidity": event_data.get("weather_humidity", 50),
-                    "condition": event_data.get("weather_condition", "unknown"),
-                    "wind_speed": event_data.get("wind_speed", 0),
-                    "pressure": event_data.get("pressure", 1013)
-                },
+                "location": event_data.get("location", "front_door"),
+                
+                # Store weather as both dict and individual fields for flexibility
+                "weather": weather_data,
+                "weather_temp": event_data.get("weather_temp"),
+                "weather_humidity": event_data.get("weather_humidity"),
+                "weather_condition": event_data.get("weather_condition"),
+                "wind_speed": event_data.get("wind_speed"),
+                "pressure": event_data.get("pressure"),
+                
                 "source": event_data.get("source", "service_call")
             }
             

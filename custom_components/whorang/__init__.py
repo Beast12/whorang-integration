@@ -527,10 +527,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             vol.Optional("ai_message"): str,
             vol.Optional("ai_title"): str,
             vol.Optional("location", default="front_door"): str,
-            vol.Optional("weather_temp"): vol.Coerce(float),
-            vol.Optional("weather_humidity"): vol.Coerce(int),
+            vol.Optional("weather_temp"): vol.Any(vol.Coerce(float), str),  # Allow templates
+            vol.Optional("weather_humidity"): vol.Any(vol.Coerce(int), str),  # Allow templates
             vol.Optional("weather_condition"): str,
-            vol.Optional("wind_speed"): vol.Coerce(float),
-            vol.Optional("pressure"): vol.Coerce(float),
+            vol.Optional("wind_speed"): vol.Any(vol.Coerce(float), str),  # Allow templates
+            vol.Optional("pressure"): vol.Any(vol.Coerce(float), str),  # Allow templates
         }),
     )

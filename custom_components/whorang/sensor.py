@@ -169,15 +169,46 @@ class WhoRangLatestVisitorSensor(WhoRangSensorEntity):
                     "source": latest_visitor.get("source", "unknown"),
                 })
                 
-                # Add weather data if available
-                weather = latest_visitor.get("weather", {})
-                if weather:
+                # Handle weather data safely - can be dict, string, or None
+                weather = latest_visitor.get("weather")
+                
+                if isinstance(weather, dict):
+                    # Weather is a dictionary - extract individual values
                     attributes[ATTR_WEATHER] = weather
                     attributes["weather_temperature"] = weather.get("temperature")
                     attributes["weather_humidity"] = weather.get("humidity")
                     attributes["weather_condition"] = weather.get("condition")
                     attributes["weather_wind_speed"] = weather.get("wind_speed")
                     attributes["weather_pressure"] = weather.get("pressure")
+                elif isinstance(weather, str):
+                    # Weather is a string - likely the condition only
+                    attributes[ATTR_WEATHER] = weather
+                    attributes["weather_temperature"] = None
+                    attributes["weather_humidity"] = None
+                    attributes["weather_condition"] = weather
+                    attributes["weather_wind_speed"] = None
+                    attributes["weather_pressure"] = None
+                else:
+                    # Weather is None or other type - set all to None
+                    attributes[ATTR_WEATHER] = None
+                    attributes["weather_temperature"] = None
+                    attributes["weather_humidity"] = None
+                    attributes["weather_condition"] = None
+                    attributes["weather_wind_speed"] = None
+                    attributes["weather_pressure"] = None
+                
+                # Add individual weather fields from latest_visitor if available
+                # (These might come directly from service calls and override the above)
+                if "weather_temp" in latest_visitor:
+                    attributes["weather_temperature"] = latest_visitor.get("weather_temp")
+                if "weather_humidity" in latest_visitor:
+                    attributes["weather_humidity"] = latest_visitor.get("weather_humidity")
+                if "weather_condition" in latest_visitor:
+                    attributes["weather_condition"] = latest_visitor.get("weather_condition")
+                if "wind_speed" in latest_visitor:
+                    attributes["weather_wind_speed"] = latest_visitor.get("wind_speed")
+                if "pressure" in latest_visitor:
+                    attributes["weather_pressure"] = latest_visitor.get("pressure")
             
             # Add service call information if available
             if last_service_call:
