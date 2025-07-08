@@ -1,0 +1,16 @@
+{
+  "domain": "whorang",
+  "name": "WhoRang AI Doorbell",
+  "codeowners": ["@Beast12"],
+  "config_flow": true,
+  "documentation": "https://github.com/Beast12/whorang-integration/blob/main/README.md",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/Beast12/whorang-integration/issues",
+  "requirements": ["aiohttp>=3.8.0", "websockets>=11.0"],
+  "version": "1.0.0",
+  "dependencies": [],
+  "after_dependencies": ["mqtt"],
+  "single_config_entry": true,
+  "loggers": ["aiohttp", "websockets"]
+}

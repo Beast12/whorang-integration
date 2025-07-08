@@ -1,0 +1,225 @@
+name: HACS Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  hacs:
+    name: HACS Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+
+  hassfest:
+    name: Hassfest Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+  validate-manifest:
+    name: Validate Manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install voluptuous
+
+      - name: Validate manifest.json
+        run: |
+          python -c "
+          import json
+          import voluptuous as vol
+          
+          # Load manifest
+          with open('custom_components/whorang/manifest.json') as f:
+              manifest = json.load(f)
+          
+          # Basic validation schema
+          schema = vol.Schema({
+              'domain': str,
+              'name': str,
+              'codeowners': [str],
+              'config_flow': bool,
+              'documentation': str,
+              'integration_type': str,
+              'iot_class': str,
+              'issue_tracker': str,
+              'requirements': [str],
+              'version': str,
+              vol.Optional('dependencies'): [str],
+              vol.Optional('after_dependencies'): [str],
+              vol.Optional('single_config_entry'): bool,
+              vol.Optional('loggers'): [str],
+          })
+          
+          # Validate
+          schema(manifest)
+          print('✅ Manifest validation passed')
+          "
+
+  validate-hacs-json:
+    name: Validate HACS JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install voluptuous
+
+      - name: Validate hacs.json
+        run: |
+          python -c "
+          import json
+          import voluptuous as vol
+          
+          # Load HACS manifest
+          with open('hacs.json') as f:
+              hacs_manifest = json.load(f)
+          
+          # HACS validation schema
+          schema = vol.Schema({
+              'name': str,
+              'content_in_root': bool,
+              'filename': str,
+              'country': [str],
+              'render_readme': bool,
+              'domains': [str],
+              'homeassistant': str,
+              'iot_class': str,
+              'quality_scale': str,
+          })
+          
+          # Validate
+          schema(hacs_manifest)
+          print('✅ HACS JSON validation passed')
+          "
+
+  check-links:
+    name: Check Documentation Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check internal links
+        run: |
+          # Check for broken internal links in documentation
+          find docs -name "*.md" -exec grep -l "\[.*\](.*\.md)" {} \; | while read file; do
+            echo "Checking links in $file"
+            grep -o "\[.*\](.*\.md)" "$file" | sed 's/.*](\(.*\))/\1/' | while read link; do
+              if [[ "$link" =~ ^\.\./ ]]; then
+                # Relative link - check if file exists
+                target_file=$(dirname "$file")/"$link"
+                if [ ! -f "$target_file" ]; then
+                  echo "❌ Broken link in $file: $link -> $target_file"
+                  exit 1
+                fi
+              fi
+            done
+          done
+          echo "✅ All internal links are valid"
+
+  lint-yaml:
+    name: Lint YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          yamllint .github/workflows/
+          echo "✅ YAML files are valid"
+
+  check-version-consistency:
+    name: Check Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          # Extract version from manifest.json
+          MANIFEST_VERSION=$(grep '"version"' custom_components/whorang/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
+          
+          # Check if CHANGELOG.md mentions this version
+          if ! grep -q "\[$MANIFEST_VERSION\]" CHANGELOG.md; then
+            echo "❌ Version $MANIFEST_VERSION not found in CHANGELOG.md"
+            exit 1
+          fi
+          
+          echo "✅ Version consistency check passed: $MANIFEST_VERSION"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run security scan
+        run: |
+          # Check for potential security issues
+          echo "🔍 Scanning for potential security issues..."
+          
+          # Check for hardcoded secrets (basic patterns)
+          if grep -r -i "password\|secret\|key\|token" custom_components/ --include="*.py" | grep -v "# " | grep -v "def " | grep -v "class "; then
+            echo "⚠️  Potential hardcoded secrets found - please review"
+          fi
+          
+          # Check for eval() usage
+          if grep -r "eval(" custom_components/ --include="*.py"; then
+            echo "❌ eval() usage found - security risk"
+            exit 1
+          fi
+          
+          # Check for exec() usage
+          if grep -r "exec(" custom_components/ --include="*.py"; then
+            echo "❌ exec() usage found - security risk"
+            exit 1
+          fi
+          
+          echo "✅ Basic security scan passed"
