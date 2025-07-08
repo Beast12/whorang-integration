@@ -275,37 +275,137 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 await asyncio.sleep(reconnect_delay)
                 reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
 
-    async def _handle_websocket_message(self, message: str) -> None:
-        """Handle incoming WebSocket message."""
+    async def _handle_websocket_message(self, message) -> None:
+        """Handle incoming WebSocket message with support for both string and JSON formats.
+        
+        WebSocket Message Formats Supported:
+        
+        1. Simple String Messages:
+           - "new_visitor" - Indicates new visitor detected
+           - "system_update" - Indicates system status change
+           - "doorbell_ring" - Indicates doorbell was pressed
+        
+        2. JSON Dictionary Messages:
+           {
+             "type": "new_visitor",
+             "data": {
+               "visitor_id": "abc123",
+               "ai_message": "Person detected",
+               "timestamp": "2025-01-08T13:21:11.307Z"
+             }
+           }
+        """
         try:
-            data = json.loads(message)
-            message_type = data.get("type")
+            _LOGGER.debug("Received WebSocket message: %s (type: %s)", message, type(message))
+            
+            # Handle simple string messages first
+            if isinstance(message, str) and not message.strip().startswith('{'):
+                await self._handle_string_message(message.strip())
+                return
+            
+            # Handle JSON string messages
+            if isinstance(message, str):
+                try:
+                    data = json.loads(message)
+                    await self._handle_json_message(data)
+                    return
+                except json.JSONDecodeError as err:
+                    _LOGGER.warning("Failed to parse WebSocket message as JSON: %s", err)
+                    # Fallback: treat as simple string message
+                    await self._handle_string_message(message.strip())
+                    return
+            
+            # Handle already parsed dictionary messages
+            elif isinstance(message, dict):
+                await self._handle_json_message(message)
+                return
+            
+            else:
+                _LOGGER.warning("Unexpected WebSocket message format: %s (type: %s)", 
+                              message, type(message))
+                
+        except Exception as err:
+            _LOGGER.error("Error processing WebSocket message: %s", err, exc_info=True)
+
+    async def _handle_string_message(self, message: str) -> None:
+        """Handle simple string WebSocket messages."""
+        try:
+            _LOGGER.info("Processing string WebSocket message: %s", message)
+            
+            if message == "new_visitor":
+                _LOGGER.info("New visitor detected via WebSocket string message")
+                await self.async_request_refresh()
+                
+            elif message == "system_update":
+                _LOGGER.info("System update detected via WebSocket string message")
+                await self.async_request_refresh()
+                
+            elif message == "doorbell_ring":
+                _LOGGER.info("Doorbell ring detected via WebSocket string message")
+                await self.async_request_refresh()
+                
+            elif message == "face_processing_complete":
+                _LOGGER.info("Face processing complete via WebSocket string message")
+                await self.async_request_refresh()
+                
+            elif message == "ai_analysis_complete":
+                _LOGGER.info("AI analysis complete via WebSocket string message")
+                await self.async_request_refresh()
+                
+            else:
+                _LOGGER.debug("Unknown WebSocket string message: %s", message)
+                # Still trigger refresh for any unknown messages
+                await self.async_request_refresh()
+                
+        except Exception as err:
+            _LOGGER.error("Error handling string WebSocket message: %s", err)
+
+    async def _handle_json_message(self, data: dict) -> None:
+        """Handle JSON dictionary WebSocket messages."""
+        try:
+            message_type = data.get("type", "unknown")
             message_data = data.get("data", {})
             
-            _LOGGER.debug("Received WebSocket message: %s", message_type)
+            _LOGGER.info("Processing JSON WebSocket message type: %s", message_type)
             
-            if message_type == WS_TYPE_NEW_VISITOR:
+            if message_type == WS_TYPE_NEW_VISITOR or message_type == "new_visitor":
                 await self._handle_new_visitor(message_data)
                 
-            elif message_type == WS_TYPE_AI_ANALYSIS_COMPLETE:
+            elif message_type == WS_TYPE_AI_ANALYSIS_COMPLETE or message_type == "ai_analysis_complete":
                 await self._handle_ai_analysis_complete(message_data)
                 
-            elif message_type == WS_TYPE_FACE_DETECTION_COMPLETE:
+            elif message_type == WS_TYPE_FACE_DETECTION_COMPLETE or message_type == "face_detection_complete":
                 await self._handle_face_detection_complete(message_data)
                 
-            elif message_type == WS_TYPE_SYSTEM_STATUS:
+            elif message_type == WS_TYPE_SYSTEM_STATUS or message_type == "system_status":
                 await self._handle_system_status(message_data)
                 
-            elif message_type == WS_TYPE_CONNECTION_STATUS:
+            elif message_type == WS_TYPE_CONNECTION_STATUS or message_type == "connection_status":
                 _LOGGER.debug("WebSocket connection status: %s", message_data)
+                
+            elif message_type == "face_recognized":
+                await self._handle_face_recognized(message_data)
+                
+            elif message_type == "unknown_face_detected":
+                await self._handle_unknown_face_detected(message_data)
+                
+            elif message_type == "face_processing_complete":
+                await self._handle_face_processing_complete(message_data)
+                
+            elif message_type == "face_processing_error":
+                await self._handle_face_processing_error(message_data)
+                
+            elif message_type == "database_cleared":
+                await self._handle_database_cleared(message_data)
+                
+            else:
+                _LOGGER.debug("Unknown WebSocket message type: %s", message_type)
                 
             # Trigger coordinator update to refresh entities
             await self.async_request_refresh()
             
-        except json.JSONDecodeError as err:
-            _LOGGER.error("Failed to decode WebSocket message: %s", err)
         except Exception as err:
-            _LOGGER.error("Error processing WebSocket message: %s", err)
+            _LOGGER.error("Error handling JSON WebSocket message: %s", err)
 
     async def _handle_new_visitor(self, visitor_data: Dict[str, Any]) -> None:
         """Handle new visitor event."""
@@ -368,6 +468,88 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
     async def _handle_system_status(self, status_data: Dict[str, Any]) -> None:
         """Handle system status update."""
         _LOGGER.debug("System status update: %s", status_data.get("status"))
+
+    async def _handle_face_recognized(self, face_data: Dict[str, Any]) -> None:
+        """Handle face recognized event."""
+        _LOGGER.info("Face recognized: %s", face_data.get("person_name", "Unknown"))
+        
+        # Fire Home Assistant event for face recognition
+        self.hass.bus.async_fire(
+            "whorang_face_recognized",
+            {
+                "person_name": face_data.get("person_name"),
+                "person_id": face_data.get("person_id"),
+                "confidence": face_data.get("confidence"),
+                "visitor_id": face_data.get("visitor_id"),
+                "timestamp": face_data.get("timestamp"),
+            }
+        )
+
+    async def _handle_unknown_face_detected(self, face_data: Dict[str, Any]) -> None:
+        """Handle unknown face detected event."""
+        _LOGGER.info("Unknown face detected for visitor: %s", face_data.get("visitor_id"))
+        
+        # Fire Home Assistant event for unknown face
+        self.hass.bus.async_fire(
+            "whorang_unknown_face_detected",
+            {
+                "visitor_id": face_data.get("visitor_id"),
+                "face_count": face_data.get("face_count", 1),
+                "timestamp": face_data.get("timestamp"),
+                "image_url": face_data.get("image_url"),
+            }
+        )
+
+    async def _handle_face_processing_complete(self, processing_data: Dict[str, Any]) -> None:
+        """Handle face processing complete event."""
+        _LOGGER.debug("Face processing complete for visitor: %s", processing_data.get("visitor_id"))
+        
+        # Fire Home Assistant event for processing completion
+        self.hass.bus.async_fire(
+            "whorang_face_processing_complete",
+            {
+                "visitor_id": processing_data.get("visitor_id"),
+                "faces_detected": processing_data.get("faces_detected", 0),
+                "known_faces": processing_data.get("known_faces", 0),
+                "unknown_faces": processing_data.get("unknown_faces", 0),
+                "processing_time": processing_data.get("processing_time"),
+                "timestamp": processing_data.get("timestamp"),
+            }
+        )
+
+    async def _handle_face_processing_error(self, error_data: Dict[str, Any]) -> None:
+        """Handle face processing error event."""
+        _LOGGER.warning("Face processing error for visitor %s: %s", 
+                       error_data.get("visitor_id"), error_data.get("error"))
+        
+        # Fire Home Assistant event for processing error
+        self.hass.bus.async_fire(
+            "whorang_face_processing_error",
+            {
+                "visitor_id": error_data.get("visitor_id"),
+                "error": error_data.get("error"),
+                "timestamp": error_data.get("timestamp"),
+            }
+        )
+
+    async def _handle_database_cleared(self, clear_data: Dict[str, Any]) -> None:
+        """Handle database cleared event."""
+        _LOGGER.info("Database cleared: %s", clear_data.get("message", "Database reset"))
+        
+        # Fire Home Assistant event for database clear
+        self.hass.bus.async_fire(
+            "whorang_database_cleared",
+            {
+                "message": clear_data.get("message"),
+                "timestamp": clear_data.get("timestamp"),
+                "records_deleted": clear_data.get("records_deleted", 0),
+            }
+        )
+        
+        # Reset local visitor statistics
+        if hasattr(self, 'data') and self.data:
+            self.data["visitor_stats"] = {}
+            self.async_set_updated_data(self.data)
 
     def _is_known_visitor(self, visitor_data: Dict[str, Any]) -> bool:
         """Check if visitor is a known person based on face recognition."""
