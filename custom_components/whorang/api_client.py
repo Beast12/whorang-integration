@@ -752,14 +752,20 @@ class WhoRangAPIClient:
         """
         try:
             # Send the doorbell event to the backend webhook endpoint
-            response = await self._request("POST", "/api/webhook", data=payload)
+            response = await self._request("POST", "/api/webhook/doorbell", data=payload)
             
             # Check if the request was successful
-            success = response.get("success", False) or response.get("status") == "ok"
+            # The webhook returns the created event object, so check for visitor_id
+            success = (
+                response.get("success", False) or 
+                response.get("status") == "ok" or
+                response.get("visitor_id") is not None
+            )
             
             if success:
                 _LOGGER.info("Successfully processed doorbell event with image: %s", 
                            payload.get("image_url", "unknown"))
+                _LOGGER.debug("Backend response: %s", response)
             else:
                 _LOGGER.error("Backend rejected doorbell event: %s", 
                             response.get("message", "Unknown error"))
