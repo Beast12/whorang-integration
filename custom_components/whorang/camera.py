@@ -87,18 +87,24 @@ class WhoRangLatestImageCamera(WhoRangCameraEntity):
     @property
     def state(self) -> str:
         """Return the state of the camera."""
-        # Check for latest image from service call or regular visitor data
-        latest_image = self.coordinator.data.get("latest_image", {}) if self.coordinator.data else {}
-        latest_visitor = self.coordinator.data.get("latest_visitor", {}) if self.coordinator.data else {}
-        
-        # Prioritize service call image data
-        image_url = latest_image.get("url") or latest_visitor.get("image_url")
-        
-        if image_url and image_url != self._last_image_url:
-            return "recording"
-        elif image_url:
-            return "idle"
-        else:
+        try:
+            # Safely get coordinator data with proper None handling
+            coordinator_data = getattr(self.coordinator, 'data', None) or {}
+            latest_image = coordinator_data.get("latest_image") or {}
+            latest_visitor = coordinator_data.get("latest_visitor") or {}
+            
+            # Both are guaranteed to be dicts now, not None
+            image_url = latest_image.get("url") or latest_visitor.get("image_url")
+            
+            if image_url and image_url != self._last_image_url:
+                return "recording"
+            elif image_url:
+                return "idle"
+            else:
+                return "unavailable"
+                
+        except Exception as e:
+            _LOGGER.debug("Error getting camera state: %s", e)
             return "unavailable"
 
     async def async_camera_image(
@@ -106,11 +112,12 @@ class WhoRangLatestImageCamera(WhoRangCameraEntity):
     ) -> Optional[bytes]:
         """Return bytes of camera image."""
         try:
-            # Check for latest image from service call first, then regular visitor data
-            latest_image = self.coordinator.data.get("latest_image", {}) if self.coordinator.data else {}
-            latest_visitor = self.coordinator.data.get("latest_visitor", {}) if self.coordinator.data else {}
+            # Safely get coordinator data with proper None handling
+            coordinator_data = getattr(self.coordinator, 'data', None) or {}
+            latest_image = coordinator_data.get("latest_image") or {}
+            latest_visitor = coordinator_data.get("latest_visitor") or {}
             
-            # Prioritize service call image data
+            # Both are guaranteed to be dicts now, not None
             image_url = latest_image.get("url") or latest_visitor.get("image_url")
             
             if not image_url:
@@ -143,54 +150,64 @@ class WhoRangLatestImageCamera(WhoRangCameraEntity):
                         return self._cached_image
                         
         except Exception as e:
-            _LOGGER.error("Error fetching camera image from %s: %s", 
-                         image_url if 'image_url' in locals() else 'unknown', e, exc_info=True)
+            _LOGGER.error("Error fetching camera image: %s", e, exc_info=True)
             return self._cached_image
 
     @property
     def extra_state_attributes(self):
         """Return additional state attributes."""
-        if not self.coordinator.data:
-            return {}
+        try:
+            # Safely get coordinator data with proper None handling
+            coordinator_data = getattr(self.coordinator, 'data', None) or {}
+            latest_image = coordinator_data.get("latest_image") or {}
+            latest_visitor = coordinator_data.get("latest_visitor") or {}
+            last_service_call = coordinator_data.get("last_service_call") or {}
             
-        # Get data from both service call and regular visitor data
-        latest_image = self.coordinator.data.get("latest_image", {})
-        latest_visitor = self.coordinator.data.get("latest_visitor", {})
-        last_service_call = self.coordinator.data.get("last_service_call", {})
-        
-        attributes = {
-            "image_url": latest_image.get("url") or latest_visitor.get("image_url"),
-            "timestamp": latest_image.get("timestamp") or latest_visitor.get("timestamp"),
-            "status": latest_image.get("status", "unknown"),
-            "source": latest_image.get("source", "unknown"),
-        }
-        
-        # Add visitor data if available
-        if latest_visitor:
-            attributes.update({
-                "visitor_id": latest_visitor.get("visitor_id"),
-                "ai_message": latest_visitor.get("ai_analysis"),
-                "ai_title": latest_visitor.get("ai_title"),
-                "faces_detected": latest_visitor.get("faces_detected", 0),
-                "confidence": latest_visitor.get("confidence", 0),
-            })
-        
-        # Add service call data if available
-        if last_service_call:
-            attributes.update({
-                "last_service_call": last_service_call.get("timestamp"),
-                "service_call_data": last_service_call.get("data", {}),
-            })
-        
-        return attributes
+            attributes = {
+                "image_url": latest_image.get("url") or latest_visitor.get("image_url"),
+                "timestamp": latest_image.get("timestamp") or latest_visitor.get("timestamp"),
+                "status": latest_image.get("status", "unknown"),
+                "source": latest_image.get("source", "unknown"),
+                "coordinator_ready": coordinator_data is not None and len(coordinator_data) > 0,
+            }
+            
+            # Add visitor data if available
+            if latest_visitor:
+                attributes.update({
+                    "visitor_id": latest_visitor.get("visitor_id"),
+                    "ai_message": latest_visitor.get("ai_analysis"),
+                    "ai_title": latest_visitor.get("ai_title"),
+                    "faces_detected": latest_visitor.get("faces_detected", 0),
+                    "confidence": latest_visitor.get("confidence", 0),
+                })
+            
+            # Add service call data if available
+            if last_service_call:
+                attributes.update({
+                    "last_service_call": last_service_call.get("timestamp"),
+                    "service_call_data": last_service_call.get("data", {}),
+                })
+            
+            return attributes
+            
+        except Exception as e:
+            _LOGGER.debug("Error getting camera attributes: %s", e)
+            return {
+                "status": "error",
+                "error": str(e),
+                "coordinator_ready": False
+            }
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # Camera is available if we have coordinator data and system is online
-        if not self.coordinator.data:
+        try:
+            # Camera is available if coordinator is successful and has data
+            coordinator_data = getattr(self.coordinator, 'data', None)
+            return (
+                self.coordinator.last_update_success and 
+                coordinator_data is not None
+            )
+        except Exception as e:
+            _LOGGER.debug("Error checking camera availability: %s", e)
             return False
-            
-        system_info = self.coordinator.data.get("system_info", {})
-        health = system_info.get("health", {})
-        return health.get("status") in ("healthy", "ok") or self.coordinator.last_update_success

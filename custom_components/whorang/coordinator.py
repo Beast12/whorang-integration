@@ -50,6 +50,16 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         self._last_visitor_id = None
         self._known_persons = {}
         
+        # Initialize with default data structure to prevent None errors
+        self.data = {
+            "latest_visitor": {},
+            "latest_image": {},
+            "doorbell_state": {},
+            "visitor_stats": {},
+            "system_info": {},
+            "last_service_call": {}
+        }
+        
         # Build WebSocket URL with proper protocol
         self.websocket_url = self._build_websocket_url()
         
@@ -76,6 +86,8 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> Dict[str, Any]:
         """Fetch data from API."""
         try:
+            _LOGGER.debug("Updating coordinator data")
+            
             # Get system information
             system_info = await self.api_client.get_system_info()
             
@@ -114,9 +126,10 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 self._last_visitor_id = latest_visitor.get("visitor_id")
                 await self._handle_new_visitor(latest_visitor)
             
-            return {
+            # Update existing data structure instead of replacing
+            updated_data = {
                 "system_info": system_info,
-                "latest_visitor": latest_visitor,
+                "latest_visitor": latest_visitor or {},
                 "known_persons": known_persons,
                 "ai_usage": ai_usage,
                 "current_ai_provider": current_ai_provider,
@@ -128,8 +141,30 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 "websocket_connected": self._websocket is not None and not self._websocket.closed,
             }
             
+            # Preserve service call data if it exists
+            if hasattr(self, 'data') and self.data:
+                for key in ["latest_image", "doorbell_state", "visitor_stats", "last_service_call"]:
+                    if key in self.data:
+                        updated_data[key] = self.data[key]
+            
+            _LOGGER.debug("Coordinator data updated successfully")
+            return updated_data
+            
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+            _LOGGER.error("Error updating coordinator data: %s", err)
+            # Return existing data instead of raising exception to prevent entity errors
+            if hasattr(self, 'data') and self.data:
+                return self.data
+            else:
+                # Return minimal safe structure
+                return {
+                    "latest_visitor": {},
+                    "latest_image": {},
+                    "doorbell_state": {},
+                    "visitor_stats": {},
+                    "system_info": {},
+                    "last_service_call": {}
+                }
 
     async def async_setup(self) -> None:
         """Set up the coordinator."""
