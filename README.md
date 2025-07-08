@@ -22,6 +22,24 @@ For Home Assistant OS and Supervised installations:
 For Home Assistant Container and Core installations:
 - **Repository**: [WhoRang Add-on](https://github.com/Beast12/whorang-addon) (includes Docker instructions)
 - **Benefits**: Standalone deployment, custom configurations
+- **Note**: Add-ons are not available for Container/Core installations. Use Docker Compose instead.
+
+**Quick Docker Setup:**
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  whorang:
+    image: ghcr.io/beast12/whorang-backend:latest
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./whorang-data:/data
+    environment:
+      - AI_PROVIDER=local
+      - LOG_LEVEL=info
+    restart: unless-stopped
+```
 
 ### ⚙️ Manual Installation
 For advanced users and custom setups:
