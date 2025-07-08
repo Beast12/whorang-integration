@@ -18,6 +18,8 @@ from .const import (
     CONF_ENABLE_WEBSOCKET,
     CONF_ENABLE_COST_TRACKING,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_OLLAMA_HOST,
+    DEFAULT_OLLAMA_PORT,
     SERVICE_TRIGGER_ANALYSIS,
     SERVICE_ADD_KNOWN_VISITOR,
     SERVICE_REMOVE_KNOWN_VISITOR,
@@ -53,9 +55,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     update_interval = entry.options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
     enable_websocket = entry.options.get(CONF_ENABLE_WEBSOCKET, True)
     enable_cost_tracking = entry.options.get(CONF_ENABLE_COST_TRACKING, True)
+    
+    # Get Ollama configuration
+    ollama_config = entry.data.get("ollama_config", {
+        "host": DEFAULT_OLLAMA_HOST,
+        "port": DEFAULT_OLLAMA_PORT,
+        "enabled": False
+    })
 
-    # Create API client
-    api_client = WhoRangAPIClient(host, port, api_key)
+    # Create API client with Ollama configuration
+    api_client = WhoRangAPIClient(
+        host=host,
+        port=port,
+        api_key=api_key,
+        ollama_config=ollama_config
+    )
 
     # Test connection
     try:
@@ -77,6 +91,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up coordinator
     await coordinator.async_setup()
+
+    # Update Ollama configuration in backend if enabled
+    if ollama_config.get("enabled", False):
+        try:
+            await api_client.set_ollama_config(
+                ollama_config.get("host", DEFAULT_OLLAMA_HOST),
+                ollama_config.get("port", DEFAULT_OLLAMA_PORT)
+            )
+            _LOGGER.info("Updated Ollama configuration in WhoRang backend: %s:%s", 
+                        ollama_config.get("host"), ollama_config.get("port"))
+        except Exception as err:
+            _LOGGER.warning("Failed to update Ollama configuration in backend: %s", err)
 
     # Store coordinator in hass data
     hass.data.setdefault(DOMAIN, {})

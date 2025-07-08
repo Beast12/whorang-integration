@@ -24,8 +24,13 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_ENABLE_WEBSOCKET,
     CONF_ENABLE_COST_TRACKING,
+    CONF_OLLAMA_HOST,
+    CONF_OLLAMA_PORT,
+    CONF_OLLAMA_ENABLED,
     DEFAULT_PORT,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_OLLAMA_HOST,
+    DEFAULT_OLLAMA_PORT,
     ERROR_CANNOT_CONNECT,
     ERROR_INVALID_AUTH,
     ERROR_INVALID_URL,
@@ -454,35 +459,58 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_ai_providers(
         self, user_input: Optional[Dict[str, Any]] = None
     ) -> FlowResult:
-        """Configure AI provider API keys."""
+        """Configure AI provider API keys and Ollama settings."""
         errors: Dict[str, str] = {}
         
         if user_input is not None:
+            # Validate Ollama connection if provided
+            ollama_host = user_input.get(CONF_OLLAMA_HOST, "").strip()
+            ollama_port = user_input.get(CONF_OLLAMA_PORT, DEFAULT_OLLAMA_PORT)
+            
+            if ollama_host:
+                try:
+                    # Test Ollama connection
+                    if not await self._test_ollama_connection(ollama_host, ollama_port):
+                        errors["ollama_host"] = "cannot_connect_ollama"
+                except Exception:
+                    errors["ollama_host"] = "invalid_ollama_config"
+            
             # Update API keys
             api_keys = {}
-            for provider, api_key in user_input.items():
-                if api_key and api_key.strip():
-                    api_keys[provider] = api_key.strip()
+            for key in ["openai_api_key", "claude_api_key", "gemini_api_key", "google_cloud_api_key"]:
+                api_key = user_input.get(key, "").strip()
+                if api_key:
+                    api_keys[key] = api_key
             
             # Test API keys if provided
-            if not api_keys or await self._test_api_keys(api_keys):
-                # Update config entry data with new API keys
+            if api_keys and not await self._test_api_keys(api_keys):
+                errors["base"] = "invalid_api_keys"
+            
+            if not errors:
+                # Update config entry data with new API keys and Ollama config
                 new_data = dict(self.config_entry.data)
                 new_data["ai_api_keys"] = api_keys
+                
+                # Update Ollama configuration
+                new_data["ollama_config"] = {
+                    "host": ollama_host if ollama_host else DEFAULT_OLLAMA_HOST,
+                    "port": ollama_port,
+                    "enabled": bool(ollama_host)
+                }
                 
                 self.hass.config_entries.async_update_entry(
                     self.config_entry, data=new_data
                 )
                 return self.async_create_entry(title="", data={})
-            else:
-                errors["base"] = "invalid_api_keys"
         
-        # Get current API keys
+        # Get current configuration
         current_keys = self.config_entry.data.get("ai_api_keys", {})
+        current_ollama = self.config_entry.data.get("ollama_config", {})
         
         return self.async_show_form(
             step_id="ai_providers",
             data_schema=vol.Schema({
+                # AI Provider API Keys
                 vol.Optional(
                     "openai_api_key", 
                     default=current_keys.get("openai_api_key", "")
@@ -499,10 +527,21 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "google_cloud_api_key",
                     default=current_keys.get("google_cloud_api_key", "")
                 ): str,
+                
+                # Ollama Configuration
+                vol.Optional(
+                    CONF_OLLAMA_HOST,
+                    default=current_ollama.get("host", DEFAULT_OLLAMA_HOST)
+                ): str,
+                vol.Optional(
+                    CONF_OLLAMA_PORT,
+                    default=current_ollama.get("port", DEFAULT_OLLAMA_PORT)
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             }),
             errors=errors,
             description_placeholders={
-                "note": "Leave fields empty to remove API keys. Only configured providers will be available for selection."
+                "ollama_note": "Configure Ollama for local AI processing. Leave host empty to disable Ollama.",
+                "api_note": "Leave API key fields empty to disable external providers."
             }
         )
 
@@ -601,6 +640,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     return response.status in [200, 400]
         except Exception as err:
             _LOGGER.debug("Google Cloud Vision API key test failed: %s", err)
+            return False
+
+    async def _test_ollama_connection(self, host: str, port: int) -> bool:
+        """Test Ollama connection."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://{host}:{port}/api/tags",
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    return response.status == 200
+        except Exception as e:
+            _LOGGER.debug("Ollama connection test failed: %s", e)
             return False
 
 
