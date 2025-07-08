@@ -448,12 +448,36 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         """Handle AI analysis complete event."""
         _LOGGER.debug("AI analysis complete: %s", analysis_data.get("visitor_id"))
         
+        # Update coordinator data with processing time information
+        if hasattr(self, 'data') and self.data:
+            # Update latest visitor with processing time
+            if "latest_visitor" in self.data:
+                self.data["latest_visitor"].update({
+                    "processing_time": analysis_data.get("processing_time") or analysis_data.get("processing_time_ms"),
+                    "analysis_provider": analysis_data.get("ai_provider"),
+                    "analysis_timestamp": analysis_data.get("timestamp")
+                })
+            
+            # Update analysis status
+            self.data["analysis_status"] = {
+                "visitor_id": analysis_data.get("visitor_id"),
+                "status": "completed",
+                "timestamp": analysis_data.get("timestamp"),
+                "processing_time_ms": analysis_data.get("processing_time") or analysis_data.get("processing_time_ms"),
+                "provider": analysis_data.get("ai_provider"),
+                "confidence": analysis_data.get("confidence_score"),
+                "objects_detected": analysis_data.get("objects_detected"),
+                "cost_usd": analysis_data.get("cost_usd")
+            }
+            
+            self.async_set_updated_data(self.data)
+        
         self.hass.bus.async_fire(
             EVENT_AI_ANALYSIS_COMPLETE,
             {
                 "visitor_id": analysis_data.get("visitor_id"),
                 "ai_provider": analysis_data.get("ai_provider"),
-                "processing_time": analysis_data.get("processing_time"),
+                "processing_time": analysis_data.get("processing_time") or analysis_data.get("processing_time_ms"),
                 "confidence_score": analysis_data.get("confidence_score"),
                 "objects_detected": analysis_data.get("objects_detected"),
                 "cost_usd": analysis_data.get("cost_usd"),

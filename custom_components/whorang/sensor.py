@@ -475,15 +475,64 @@ class WhoRangAIResponseTimeSensor(WhoRangSensorEntity):
     @property
     def native_value(self) -> Optional[int]:
         """Return the state of the sensor."""
+        # Check coordinator data first (includes service call updates and WebSocket data)
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor")
+            if latest_visitor and latest_visitor.get("processing_time"):
+                processing_time = latest_visitor.get("processing_time")
+                if isinstance(processing_time, str):
+                    # Handle string format (remove "ms" suffix if present)
+                    return int(processing_time.replace("ms", ""))
+                elif isinstance(processing_time, (int, float)):
+                    return int(processing_time)
+            
+            # Check WebSocket analysis status data
+            analysis_status = self.coordinator.data.get("analysis_status", {})
+            if analysis_status.get("processing_time_ms"):
+                return int(analysis_status.get("processing_time_ms"))
+        
+        # Fallback to API data
         latest_visitor = self.coordinator.async_get_latest_visitor()
         if latest_visitor and latest_visitor.get("processing_time"):
-            # Convert processing_time to milliseconds if needed
             processing_time = latest_visitor.get("processing_time")
-            if isinstance(processing_time, str) and "ms" in processing_time:
+            if isinstance(processing_time, str):
+                # Handle string format (remove "ms" suffix if present)
                 return int(processing_time.replace("ms", ""))
             elif isinstance(processing_time, (int, float)):
                 return int(processing_time)
+        
         return None
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        attributes = {}
+        
+        # Get processing time details from coordinator data
+        if self.coordinator.data:
+            latest_visitor = self.coordinator.data.get("latest_visitor", {})
+            analysis_status = self.coordinator.data.get("analysis_status", {})
+            
+            # Add AI provider information
+            attributes["ai_provider"] = latest_visitor.get("analysis_provider") or analysis_status.get("provider")
+            attributes["analysis_timestamp"] = latest_visitor.get("analysis_timestamp") or analysis_status.get("timestamp")
+            attributes["confidence_score"] = latest_visitor.get("confidence") or analysis_status.get("confidence")
+            
+            # Add processing status
+            if analysis_status:
+                attributes["analysis_status"] = analysis_status.get("status", "unknown")
+                attributes["visitor_id"] = analysis_status.get("visitor_id")
+        
+        # Fallback to API data
+        if not attributes:
+            latest_visitor = self.coordinator.async_get_latest_visitor()
+            if latest_visitor:
+                attributes["ai_provider"] = latest_visitor.get("ai_provider", "unknown")
+                attributes["analysis_timestamp"] = latest_visitor.get("timestamp")
+                attributes["confidence_score"] = latest_visitor.get("confidence_score")
+                attributes["visitor_id"] = latest_visitor.get("visitor_id")
+        
+        return attributes
 
 
 class WhoRangKnownFacesCountSensor(WhoRangSensorEntity):
