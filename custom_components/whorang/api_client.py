@@ -48,6 +48,7 @@ class WhoRangAPIClient:
         verify_ssl: bool = True,
         session: Optional[aiohttp.ClientSession] = None,
         timeout: int = DEFAULT_TIMEOUT,
+        ollama_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Initialize the API client."""
         self.host = host
@@ -56,6 +57,11 @@ class WhoRangAPIClient:
         self.verify_ssl = verify_ssl
         self.api_key = api_key
         self.timeout = timeout
+        self.ollama_config = ollama_config or {
+            "host": "localhost",
+            "port": 11434,
+            "enabled": False
+        }
         self._session = session
         self._close_session = False
         self._ssl_context = None
@@ -515,7 +521,45 @@ class WhoRangAPIClient:
             return default_models.get(provider, [])
 
     async def get_ollama_models(self) -> List[Dict[str, Any]]:
-        """Get available Ollama models from existing endpoint."""
+        """Get available Ollama models using configured host/port."""
+        if not self.ollama_config.get("enabled", False):
+            _LOGGER.debug("Ollama not enabled in configuration")
+            return []
+            
+        ollama_host = self.ollama_config.get("host", "localhost")
+        ollama_port = self.ollama_config.get("port", 11434)
+        
+        try:
+            # Try direct Ollama connection first
+            return await self._query_ollama_direct(ollama_host, ollama_port)
+        except Exception as e:
+            _LOGGER.error("Failed to get Ollama models from %s:%s - %s", 
+                         ollama_host, ollama_port, e)
+            # Fallback to WhoRang proxy
+            return await self._get_ollama_models_via_whorang()
+
+    async def _query_ollama_direct(self, host: str, port: int) -> List[Dict[str, Any]]:
+        """Query Ollama API directly using configured host/port."""
+        ollama_url = f"http://{host}:{port}"
+        
+        try:
+            session = await self._get_session()
+            async with session.get(
+                f"{ollama_url}/api/tags",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return self._parse_ollama_models(data.get("models", []))
+                else:
+                    _LOGGER.warning("Ollama API returned status %s", response.status)
+                    return []
+        except Exception as e:
+            _LOGGER.error("Failed to query Ollama at %s:%s - %s", host, port, e)
+            return []
+
+    async def _get_ollama_models_via_whorang(self) -> List[Dict[str, Any]]:
+        """Get Ollama models via WhoRang proxy (fallback method)."""
         try:
             response = await self._request("GET", "/api/faces/ollama/models")
             models_data = response.get("models", [])
@@ -532,31 +576,101 @@ class WhoRangAPIClient:
                         "is_vision": True  # Backend already filters for vision models
                     })
             
-            _LOGGER.debug("Retrieved %d Ollama models", len(transformed_models))
+            _LOGGER.debug("Retrieved %d Ollama models via WhoRang proxy", len(transformed_models))
             return transformed_models
             
         except Exception as e:
-            _LOGGER.error("Failed to get Ollama models: %s", e)
+            _LOGGER.error("Failed to get Ollama models via WhoRang proxy: %s", e)
             return []
 
+    def _parse_ollama_models(self, models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Parse Ollama models from direct API response."""
+        transformed_models = []
+        for model in models:
+            if isinstance(model, dict):
+                # Filter for vision-capable models
+                model_name = model.get("name", "")
+                if any(vision_keyword in model_name.lower() for vision_keyword in 
+                       ["llava", "vision", "cogvlm", "bakllava", "llama-vision"]):
+                    transformed_models.append({
+                        "name": model_name,
+                        "display_name": model_name,
+                        "size": model.get("size", 0),
+                        "modified_at": model.get("modified_at"),
+                        "is_vision": True
+                    })
+        
+        _LOGGER.debug("Parsed %d vision-capable Ollama models", len(transformed_models))
+        return transformed_models
+
     async def get_ollama_status(self) -> Dict[str, Any]:
-        """Get Ollama connection status."""
-        try:
-            response = await self._request("POST", "/api/faces/ollama/test")
+        """Get Ollama connection status using configured host/port."""
+        if not self.ollama_config.get("enabled", False):
             return {
-                "status": "connected" if response.get("success") else "disconnected",
-                "version": response.get("version"),
-                "url": response.get("ollama_url"),
-                "message": response.get("message"),
-                "last_check": response.get("debug", {}).get("response_data", {})
+                "status": "disabled",
+                "message": "Ollama not enabled in configuration"
             }
+            
+        ollama_host = self.ollama_config.get("host", "localhost")
+        ollama_port = self.ollama_config.get("port", 11434)
+        
+        try:
+            # Try direct connection first
+            if await self._test_ollama_connection(ollama_host, ollama_port):
+                return {
+                    "status": "connected",
+                    "host": ollama_host,
+                    "port": ollama_port,
+                    "message": f"Connected to Ollama at {ollama_host}:{ollama_port}"
+                }
+            else:
+                # Fallback to WhoRang proxy test
+                response = await self._request("POST", "/api/faces/ollama/test")
+                return {
+                    "status": "connected" if response.get("success") else "disconnected",
+                    "version": response.get("version"),
+                    "url": response.get("ollama_url"),
+                    "message": response.get("message"),
+                    "last_check": response.get("debug", {}).get("response_data", {}),
+                    "fallback": True
+                }
         except Exception as e:
             _LOGGER.error("Failed to get Ollama status: %s", e)
             return {
                 "status": "disconnected", 
                 "error": str(e),
-                "message": f"Connection failed: {e}"
+                "message": f"Connection failed: {e}",
+                "host": ollama_host,
+                "port": ollama_port
             }
+
+    async def _test_ollama_connection(self, host: str, port: int) -> bool:
+        """Test Ollama connection."""
+        try:
+            session = await self._get_session()
+            async with session.get(
+                f"http://{host}:{port}/api/tags",
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                return response.status == 200
+        except Exception as e:
+            _LOGGER.debug("Ollama connection test failed: %s", e)
+            return False
+
+    async def set_ollama_config(self, host: str, port: int) -> bool:
+        """Update Ollama configuration in WhoRang backend."""
+        try:
+            response = await self._request("POST", "/api/ai/providers/local/config", data={
+                "ollama": {
+                    "host": host,
+                    "port": port,
+                    "enabled": True
+                }
+            })
+            return response.get("success", False)
+        except Exception as e:
+            _LOGGER.error("Failed to set Ollama config: %s", e)
+            return False
 
     def _format_size(self, size_bytes: int) -> str:
         """Format model size for display."""
@@ -566,7 +680,7 @@ class WhoRangAPIClient:
         for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.1f} {unit}"
-            size_bytes /= 1024.0
+            size_bytes = int(size_bytes / 1024.0)
         return f"{size_bytes:.1f} PB"
 
     async def get_system_info(self) -> Dict[str, Any]:

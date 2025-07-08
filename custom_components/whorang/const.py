@@ -16,12 +16,17 @@ CONF_API_KEY: Final = "api_key"
 CONF_UPDATE_INTERVAL: Final = "update_interval"
 CONF_ENABLE_WEBSOCKET: Final = "enable_websocket"
 CONF_ENABLE_COST_TRACKING: Final = "enable_cost_tracking"
+CONF_OLLAMA_HOST: Final = "ollama_host"
+CONF_OLLAMA_PORT: Final = "ollama_port"
+CONF_OLLAMA_ENABLED: Final = "ollama_enabled"
 
 # Default values
 DEFAULT_PORT: Final = 3001
 DEFAULT_UPDATE_INTERVAL: Final = 30
 DEFAULT_TIMEOUT: Final = 10
 DEFAULT_WEBSOCKET_TIMEOUT: Final = 30
+DEFAULT_OLLAMA_HOST: Final = "localhost"
+DEFAULT_OLLAMA_PORT: Final = 11434
 
 # API endpoints
 API_HEALTH: Final = "/health"
