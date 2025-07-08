@@ -319,17 +319,53 @@ class WhoRangAICostTodaySensor(WhoRangSensorEntity):
     def native_value(self) -> float:
         """Return the state of the sensor."""
         ai_usage = self.coordinator.async_get_ai_usage()
-        return round(ai_usage.get("total_cost", 0), 4)
+        total_cost = ai_usage.get("total_cost", 0)
+        
+        # Ensure we return a proper float value, rounded to 4 decimal places for currency precision
+        if isinstance(total_cost, (int, float)):
+            return round(float(total_cost), 4)
+        return 0.0
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
         ai_usage = self.coordinator.async_get_ai_usage()
         
-        return {
+        # Build comprehensive attributes with provider breakdown
+        attributes = {
             "total_requests": ai_usage.get("total_requests", 0),
-            "providers": ai_usage.get("providers", []),
+            "period": ai_usage.get("period", "24h"),
+            "providers_count": len(ai_usage.get("providers", [])),
         }
+        
+        # Add provider-specific cost breakdown
+        providers = ai_usage.get("providers", [])
+        for provider_data in providers:
+            provider_name = provider_data.get("provider", "unknown")
+            attributes[f"{provider_name}_cost"] = round(provider_data.get("cost", 0), 4)
+            attributes[f"{provider_name}_requests"] = provider_data.get("requests", 0)
+            attributes[f"{provider_name}_tokens"] = provider_data.get("tokens", 0)
+            attributes[f"{provider_name}_success_rate"] = round(provider_data.get("success_rate", 0), 1)
+        
+        # Add budget information if available
+        budget = ai_usage.get("budget", {})
+        if budget:
+            attributes["monthly_budget_limit"] = budget.get("monthly_limit", 0)
+            attributes["monthly_spent"] = round(budget.get("monthly_spent", 0), 4)
+            attributes["monthly_remaining"] = round(budget.get("remaining", 0), 4)
+            
+            # Calculate budget usage percentage
+            monthly_limit = budget.get("monthly_limit", 0)
+            monthly_spent = budget.get("monthly_spent", 0)
+            if monthly_limit > 0:
+                attributes["budget_usage_percent"] = round((monthly_spent / monthly_limit) * 100, 1)
+            else:
+                attributes["budget_usage_percent"] = 0
+        
+        # Add provider list for easy reference
+        attributes["active_providers"] = [p.get("provider") for p in providers if p.get("cost", 0) > 0]
+        
+        return attributes
 
 
 class WhoRangAIResponseTimeSensor(WhoRangSensorEntity):

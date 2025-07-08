@@ -387,35 +387,72 @@ class WhoRangAPIClient:
             return None
 
     async def get_ai_usage_stats(self, days: int = 1) -> Dict[str, Any]:
-        """Get AI usage statistics with multiple endpoint fallbacks."""
-        endpoints_to_try = [
-            "/api/ai/usage",      # Primary endpoint
-            "/api/stats/ai",      # Alternative endpoint
-            "/api/analytics/ai",  # Another alternative
-            "/api/system/usage"   # Fallback endpoint
-        ]
-        
-        params = {"days": days}
-        
-        for endpoint in endpoints_to_try:
-            try:
-                response = await self._request("GET", endpoint, params=params)
-                if response:
-                    # Handle different response formats
-                    if isinstance(response, dict):
-                        return response.get("data", response) if "data" in response else response
-                    return {}
-            except Exception as e:
-                _LOGGER.debug("AI usage endpoint %s failed: %s", endpoint, e)
-                continue
-        
-        # Return default empty stats if all endpoints fail
-        _LOGGER.info("No AI usage stats available, using defaults")
+        """Get AI usage statistics from the backend."""
+        try:
+            # Try the new dedicated AI endpoint first
+            response = await self._request("GET", "/api/ai/usage", params={"days": days})
+            
+            if response and not response.get("error"):
+                # The new endpoint returns data in the exact format we need
+                return response
+            
+            # Fallback to the OpenAI endpoint if the new one doesn't exist yet
+            _LOGGER.debug("New AI endpoint not available, trying OpenAI endpoint")
+            period = "24h" if days == 1 else f"{days}d"
+            response = await self._request("GET", "/api/openai/usage/stats", params={"period": period})
+            
+            if response:
+                # Parse the backend response format
+                overall_stats = response.get("overall_stats", [])
+                budget = response.get("budget", {})
+                
+                # Calculate total cost across all providers
+                total_cost = sum(stat.get("total_cost", 0) for stat in overall_stats)
+                total_requests = sum(stat.get("total_requests", 0) for stat in overall_stats)
+                
+                # Create provider breakdown
+                providers = []
+                for stat in overall_stats:
+                    providers.append({
+                        "provider": stat.get("provider", "unknown"),
+                        "cost": stat.get("total_cost", 0),
+                        "requests": stat.get("total_requests", 0),
+                        "tokens": stat.get("total_tokens", 0),
+                        "avg_processing_time": stat.get("avg_processing_time", 0),
+                        "success_rate": (stat.get("successful_requests", 0) / max(stat.get("total_requests", 1), 1)) * 100
+                    })
+                
+                return {
+                    "total_cost": total_cost,
+                    "total_requests": total_requests,
+                    "providers": providers,
+                    "budget": {
+                        "monthly_limit": budget.get("monthly_limit", 0),
+                        "monthly_spent": budget.get("monthly_spent", 0),
+                        "remaining": budget.get("remaining", 0)
+                    },
+                    "period": period
+                }
+            
+            # Return default if no response
+            return self._get_default_ai_usage_stats()
+            
+        except Exception as e:
+            _LOGGER.error("Failed to get AI usage stats: %s", e)
+            return self._get_default_ai_usage_stats()
+
+    def _get_default_ai_usage_stats(self) -> Dict[str, Any]:
+        """Return default AI usage statistics when no data is available."""
         return {
-            "cost_today": 0.0,
-            "requests_today": 0,
-            "cost_total": 0.0,
-            "requests_total": 0
+            "total_cost": 0.0,
+            "total_requests": 0,
+            "providers": [],
+            "budget": {
+                "monthly_limit": 0,
+                "monthly_spent": 0,
+                "remaining": 0
+            },
+            "period": "24h"
         }
 
     async def export_visitor_data(
