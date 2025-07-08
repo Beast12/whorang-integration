@@ -398,6 +398,15 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
             elif message_type == "database_cleared":
                 await self._handle_database_cleared(message_data)
                 
+            elif message_type == "analysis_started":
+                await self._handle_analysis_started(message_data)
+                
+            elif message_type == "analysis_complete":
+                await self._handle_analysis_complete_auto(message_data)
+                
+            elif message_type == "analysis_error":
+                await self._handle_analysis_error(message_data)
+                
             else:
                 _LOGGER.debug("Unknown WebSocket message type: %s", message_type)
                 
@@ -550,6 +559,103 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         if hasattr(self, 'data') and self.data:
             self.data["visitor_stats"] = {}
             self.async_set_updated_data(self.data)
+
+    async def _handle_analysis_started(self, analysis_data: Dict[str, Any]) -> None:
+        """Handle automatic AI analysis started event."""
+        _LOGGER.info("AI analysis started for visitor: %s", analysis_data.get('visitor_id'))
+        
+        # Update coordinator data to show analysis in progress
+        if hasattr(self, 'data') and self.data:
+            self.data["ai_processing"] = True
+            self.data["analysis_status"] = {
+                "visitor_id": analysis_data.get('visitor_id'),
+                "status": "started",
+                "timestamp": analysis_data.get('timestamp'),
+                "image_url": analysis_data.get('image_url')
+            }
+            self.async_set_updated_data(self.data)
+        
+        # Fire Home Assistant event
+        self.hass.bus.async_fire(
+            "whorang_analysis_started",
+            {
+                "visitor_id": analysis_data.get('visitor_id'),
+                "image_url": analysis_data.get('image_url'),
+                "timestamp": analysis_data.get('timestamp'),
+                "automatic": True
+            }
+        )
+
+    async def _handle_analysis_complete_auto(self, analysis_data: Dict[str, Any]) -> None:
+        """Handle automatic AI analysis completed event."""
+        _LOGGER.info("AI analysis completed for visitor: %s", analysis_data.get('visitor_id'))
+        
+        # Update coordinator data with analysis results
+        if hasattr(self, 'data') and self.data:
+            # Update latest visitor with analysis results
+            if "latest_visitor" in self.data:
+                self.data["latest_visitor"].update({
+                    "ai_analysis": analysis_data.get("analysis"),
+                    "confidence": analysis_data.get("confidence", 0),
+                    "faces_detected": analysis_data.get("faces_detected", 0),
+                    "analysis_provider": analysis_data.get("provider", "unknown"),
+                    "analysis_timestamp": analysis_data.get("timestamp")
+                })
+            
+            # Set AI processing to false
+            self.data["ai_processing"] = False
+            self.data["analysis_status"] = {
+                "visitor_id": analysis_data.get('visitor_id'),
+                "status": "completed",
+                "timestamp": analysis_data.get('timestamp'),
+                "analysis": analysis_data.get("analysis"),
+                "confidence": analysis_data.get("confidence", 0),
+                "faces_detected": analysis_data.get("faces_detected", 0),
+                "provider": analysis_data.get("provider", "unknown")
+            }
+            
+            self.async_set_updated_data(self.data)
+        
+        # Fire Home Assistant event
+        self.hass.bus.async_fire(
+            "whorang_analysis_complete",
+            {
+                "visitor_id": analysis_data.get('visitor_id'),
+                "analysis": analysis_data.get("analysis"),
+                "confidence": analysis_data.get("confidence", 0),
+                "faces_detected": analysis_data.get("faces_detected", 0),
+                "provider": analysis_data.get("provider", "unknown"),
+                "timestamp": analysis_data.get('timestamp'),
+                "automatic": True
+            }
+        )
+
+    async def _handle_analysis_error(self, error_data: Dict[str, Any]) -> None:
+        """Handle automatic AI analysis error event."""
+        _LOGGER.warning("AI analysis error for visitor %s: %s", 
+                       error_data.get("visitor_id"), error_data.get("error"))
+        
+        # Update coordinator data to show analysis failed
+        if hasattr(self, 'data') and self.data:
+            self.data["ai_processing"] = False
+            self.data["analysis_status"] = {
+                "visitor_id": error_data.get('visitor_id'),
+                "status": "error",
+                "timestamp": error_data.get('timestamp'),
+                "error": error_data.get("error")
+            }
+            self.async_set_updated_data(self.data)
+        
+        # Fire Home Assistant event
+        self.hass.bus.async_fire(
+            "whorang_analysis_error",
+            {
+                "visitor_id": error_data.get('visitor_id'),
+                "error": error_data.get("error"),
+                "timestamp": error_data.get('timestamp'),
+                "automatic": True
+            }
+        )
 
     def _is_known_visitor(self, visitor_data: Dict[str, Any]) -> bool:
         """Check if visitor is a known person based on face recognition."""
