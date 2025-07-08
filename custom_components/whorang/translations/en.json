@@ -17,11 +17,7 @@
       },
       "discovery_confirm": {
         "title": "Confirm WhoRang Discovery",
-        "description": "A WhoRang AI Doorbell system was discovered on your network. Do you want to add it to Home Assistant?",
-        "description_placeholders": {
-          "host": "Host",
-          "port": "Port"
-        }
+        "description": "A WhoRang AI Doorbell system was discovered on your network. Do you want to add it to Home Assistant?"
       }
     },
     "error": {
