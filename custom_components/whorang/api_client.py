@@ -919,80 +919,84 @@ class WhoRangAPIClient:
             return None
 
     async def get_face_gallery_data(self) -> Dict[str, Any]:
-        """Get comprehensive face gallery data with proper image URLs."""
+        """Get comprehensive face gallery data using the actual addon endpoint."""
         try:
-            # Get unknown faces with image URLs
-            unknown_response = await self._request("GET", "/api/detected-faces/unassigned")
+            # Use the actual face gallery endpoint from the addon
+            response = await self._request("GET", "/api/faces/gallery")
             
-            # Handle different response formats - could be list or dict
-            if isinstance(unknown_response, list):
-                unknown_faces = unknown_response
-            elif isinstance(unknown_response, dict):
-                unknown_faces = unknown_response.get("faces", [])
+            # The addon returns: { success: true, data: { unknown_faces: [...], known_persons: [...], statistics: {...} } }
+            if response.get("success") and "data" in response:
+                gallery_data = response["data"]
+                
+                # Extract data from the addon's response format
+                unknown_faces = gallery_data.get("unknown_faces", [])
+                known_persons = gallery_data.get("known_persons", [])
+                statistics = gallery_data.get("statistics", {})
+                
+                # Process unknown faces - they already have the correct image URLs from the addon
+                processed_unknown = []
+                for face in unknown_faces:
+                    if isinstance(face, dict):
+                        face_data = {
+                            "id": face.get("id"),
+                            "image_url": face.get("image_url"),
+                            "thumbnail_url": face.get("thumbnail_url"),
+                            "quality": face.get("quality_score", 0),
+                            "confidence": face.get("confidence", 0),
+                            "detection_date": face.get("detection_date"),
+                            "description": face.get("description", "Unknown person"),
+                            "selectable": True,
+                            "bounding_box": face.get("bounding_box"),
+                            "original_image_url": face.get("original_image_url")
+                        }
+                        processed_unknown.append(face_data)
+                
+                # Process known persons - they already have the correct avatar URLs from the addon
+                processed_known = []
+                for person in known_persons:
+                    if isinstance(person, dict):
+                        person_data = {
+                            "id": person.get("id"),
+                            "name": person.get("name"),
+                            "face_count": person.get("face_count", 0),
+                            "last_seen": person.get("last_seen"),
+                            "first_seen": person.get("first_seen"),
+                            "avg_confidence": person.get("avg_confidence", 0),
+                            "avatar_url": person.get("avatar_url")
+                        }
+                        processed_known.append(person_data)
+                
+                # Use statistics from the addon
+                total_unknown = statistics.get("total_unknown", len(processed_unknown))
+                total_known = statistics.get("total_known_persons", len(processed_known))
+                total_labeled_faces = statistics.get("total_labeled_faces", 0)
+                progress = statistics.get("labeling_progress", 100)
+                
+                return {
+                    "unknown_faces": processed_unknown,
+                    "known_persons": processed_known,
+                    "total_unknown": total_unknown,
+                    "total_known": total_known,
+                    "total_faces": total_unknown + total_labeled_faces,
+                    "labeling_progress": progress,
+                    "gallery_ready": True,
+                    "last_updated": datetime.now().isoformat()
+                }
             else:
-                unknown_faces = []
-            
-            # Get known persons
-            persons_response = await self._request("GET", "/api/faces/persons")
-            
-            # Handle different response formats - could be list or dict
-            if isinstance(persons_response, list):
-                known_persons = persons_response
-            elif isinstance(persons_response, dict):
-                known_persons = persons_response.get("data", [])
-            else:
-                known_persons = []
-            
-            # Build face gallery data with proper URLs
-            base_url = self.base_url
-            
-            processed_unknown = []
-            for face in unknown_faces:
-                if isinstance(face, dict):
-                    face_data = {
-                        "id": face.get("id"),
-                        "image_url": f"{base_url}/api/faces/{face.get('id')}/image",
-                        "thumbnail_url": f"{base_url}/api/faces/{face.get('id')}/image?size=150",
-                        "quality": face.get("quality_score", 0),
-                        "confidence": face.get("confidence", 0),
-                        "detection_date": face.get("created_at"),
-                        "description": face.get("description", "Unknown person"),
-                        "event_id": face.get("visitor_event_id"),
-                        "selectable": True,
-                        "face_crop_path": face.get("face_crop_path", ""),
-                        "original_image": face.get("original_image", "")
-                    }
-                    processed_unknown.append(face_data)
-            
-            processed_known = []
-            for person in known_persons:
-                if isinstance(person, dict):
-                    person_data = {
-                        "id": person.get("id"),
-                        "name": person.get("name"),
-                        "face_count": person.get("face_count", 0),
-                        "last_seen": person.get("last_seen"),
-                        "avatar_url": f"{base_url}/api/persons/{person.get('id')}/avatar",
-                        "recognition_count": person.get("recognition_count", 0),
-                        "notes": person.get("notes", "")
-                    }
-                    processed_known.append(person_data)
-            
-            total_unknown = len(processed_unknown)
-            total_known = len(processed_known)
-            total_faces = total_unknown + total_known
-            progress = (total_known / total_faces * 100) if total_faces > 0 else 100
-            
-            return {
-                "unknown_faces": processed_unknown,
-                "known_persons": processed_known,
-                "total_unknown": total_unknown,
-                "total_known": total_known,
-                "total_faces": total_faces,
-                "labeling_progress": progress,
-                "gallery_ready": True,
-                "last_updated": datetime.now().isoformat()
-            }
+                # Handle case where addon returns error or unexpected format
+                error_msg = response.get("error", "Unknown error from addon")
+                _LOGGER.warning("Face gallery endpoint returned error: %s", error_msg)
+                return {
+                    "unknown_faces": [],
+                    "known_persons": [],
+                    "total_unknown": 0,
+                    "total_known": 0,
+                    "total_faces": 0,
+                    "labeling_progress": 100,
+                    "gallery_ready": False,
+                    "error": error_msg,
+                    "last_updated": datetime.now().isoformat()
+                }
             
         except Exception as e:
             _LOGGER.error("Failed to get face gallery data: %s", e)
