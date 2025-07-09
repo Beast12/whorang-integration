@@ -28,7 +28,7 @@ input_text:
   quick_person_name:
     name: Quick Person Name
     max: 100
-    icon: mdi:account-fast
+    icon: mdi:account-start
 ```
 
 ### 2. Add Dashboard
