@@ -470,7 +470,8 @@ class WhoRangFaceManagerCard extends HTMLElement {
       }
       
       const quality = Math.round((face.quality || 0) * 100);
-      const imageUrl = face.image_url || face.thumbnail_url;
+      // Construct the correct image URL for WhoRang server
+      const imageUrl = face.image_url || face.thumbnail_url || `http://127.0.0.1:3001/api/faces/${face.id}/image?size=thumbnail`;
       
       faceCard.innerHTML = `
         <div class="loading">Loading...</div>

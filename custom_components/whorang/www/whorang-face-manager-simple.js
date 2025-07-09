@@ -165,7 +165,7 @@ class WhoRangFaceManagerCard extends HTMLElement {
             faceItem.className = 'face-item';
             faceItem.dataset.faceId = face.id;
 
-            const imageUrl = face.image_url || face.crop_path || `/api/faces/${face.id}/image?size=thumbnail`;
+            const imageUrl = face.image_url || face.crop_path || `http://127.0.0.1:3001/api/faces/${face.id}/image?size=thumbnail`;
             
             faceItem.innerHTML = `
                 <div class="face-image">
@@ -264,14 +264,14 @@ class WhoRangFaceManagerCard extends HTMLElement {
     }
 }
 
-customElements.define('whorang-face-manager-card', WhoRangFaceManagerCard);
+customElements.define('whorang-face-manager-simple-card', WhoRangFaceManagerCard);
 
 // Register with window for debugging
 window.customCards = window.customCards || [];
 window.customCards.push({
-    type: 'whorang-face-manager-card',
-    name: 'WhoRang Face Manager Card',
-    description: 'Visual face management for WhoRang AI Doorbell'
+    type: 'whorang-face-manager-simple-card',
+    name: 'WhoRang Face Manager Simple Card',
+    description: 'Simple visual face management for WhoRang AI Doorbell'
 });
 
-console.log('WhoRang Face Manager Card (Simple) loaded successfully');
+console.log('WhoRang Face Manager Simple Card loaded successfully');

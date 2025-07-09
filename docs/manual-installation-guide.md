@@ -27,22 +27,24 @@ cp /config/custom_components/whorang/www/whorang-face-manager-simple.js /config/
 2. **Click "+ Add Resource"**
 
 ### For Option A (community directory):
-3. **Add Resource 1:**
+3. **Add Resource 1 (Main Card):**
    - URL: `/local/community/whorang/whorang-face-manager.js`
    - Type: **JavaScript Module**
-4. **Add Resource 2:**
+4. **Add Resource 2 (Simple Card - Optional):**
    - URL: `/local/community/whorang/whorang-face-manager-simple.js`
    - Type: **JavaScript Module**
 
 ### For Option B (www directory):
-3. **Add Resource 1:**
+3. **Add Resource 1 (Main Card):**
    - URL: `/local/whorang-face-manager.js`
    - Type: **JavaScript Module**
-4. **Add Resource 2:**
+4. **Add Resource 2 (Simple Card - Optional):**
    - URL: `/local/whorang-face-manager-simple.js`
    - Type: **JavaScript Module**
 
-5. **Click "Create"** for both resources
+5. **Click "Create"** for each resource
+
+**Note**: You can register both cards or just one. The main card uses `whorang-face-manager-card` and the simple card uses `whorang-face-manager-simple-card`.
 
 ## Step 3: Create Input Helpers
 
