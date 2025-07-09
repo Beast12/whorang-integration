@@ -152,30 +152,11 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
             StaticPathConfig("/whorang-face-manager", www_dir, True)
         ])
         
-        # Add frontend resources to Lovelace
-        frontend_url = "/whorang-face-manager/whorang-face-manager.js"
+        _LOGGER.info("Successfully registered static path for WhoRang Face Manager cards")
         
-        # Register the card with frontend
-        hass.components.frontend.add_extra_js_url(frontend_url)
-        
-        _LOGGER.info("Successfully registered WhoRang Face Manager custom card at %s", frontend_url)
-        
-        # Also register the simple version
-        frontend_url_simple = "/whorang-face-manager/whorang-face-manager-simple.js"
-        hass.components.frontend.add_extra_js_url(frontend_url_simple)
-        _LOGGER.info("Also registered simple version at %s", frontend_url_simple)
-        
-        # Also try to register with the resource manager
-        try:
-            await hass.components.lovelace.async_register_resource(
-                frontend_url, "module"
-            )
-            await hass.components.lovelace.async_register_resource(
-                frontend_url_simple, "module"
-            )
-            _LOGGER.info("Also registered both cards with Lovelace resource manager")
-        except Exception as resource_err:
-            _LOGGER.debug("Could not register with Lovelace resource manager: %s", resource_err)
+        # The cards will be automatically available at:
+        # /whorang-face-manager/whorang-face-manager.js
+        # /whorang-face-manager/whorang-face-manager-simple.js
         
     except Exception as err:
         _LOGGER.error("Failed to register frontend resources: %s", err)
