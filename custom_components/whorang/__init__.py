@@ -138,28 +138,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
     """Register frontend resources for custom cards."""
-    try:
-        import os
-        
-        # Get the correct path to the www directory
-        integration_dir = os.path.dirname(__file__)
-        www_dir = os.path.join(integration_dir, "www")
-        
-        _LOGGER.info("Registering frontend resources from: %s", www_dir)
-        
-        # Register static path for custom cards using the new async method
-        await hass.http.async_register_static_paths([
-            StaticPathConfig("/whorang-face-manager", www_dir, True)
-        ])
-        
-        _LOGGER.info("Successfully registered static path for WhoRang Face Manager cards")
-        
-        # The cards will be automatically available at:
-        # /whorang-face-manager/whorang-face-manager.js
-        # /whorang-face-manager/whorang-face-manager-simple.js
-        
-    except Exception as err:
-        _LOGGER.error("Failed to register frontend resources: %s", err)
+    # Temporarily disabled to avoid registration issues
+    # Custom cards can be manually registered via Dashboard Resources
+    _LOGGER.info("Frontend resource registration disabled - use manual registration")
+    _LOGGER.info("Custom cards available at:")
+    _LOGGER.info("- /local/community/whorang/whorang-face-manager.js")
+    _LOGGER.info("- /local/community/whorang/whorang-face-manager-simple.js")
+    _LOGGER.info("Manual registration: Settings → Dashboards → Resources")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
