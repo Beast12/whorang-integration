@@ -639,20 +639,59 @@ class WhoRangUnknownFacesSensor(WhoRangSensorEntity):
                     attributes["oldest_unknown_face"] = unknown_faces[0] if unknown_faces else None
                     
                     # Quality statistics
-                    qualities = [face.get(ATTR_FACE_QUALITY, 0) for face in unknown_faces if isinstance(face, dict)]
+                    qualities = [face.get("quality_score", 0) for face in unknown_faces if isinstance(face, dict)]
                     if qualities:
                         attributes["avg_quality"] = round(sum(qualities) / len(qualities), 2)
                         attributes["min_quality"] = min(qualities)
                         attributes["max_quality"] = max(qualities)
                 
-                # Add face IDs for easy reference
+                # Enhanced face details for easy viewing and labeling
+                face_details = []
                 face_ids = []
                 for face in unknown_faces:
-                    if isinstance(face, dict) and face.get(ATTR_FACE_ID):
-                        face_ids.append(face[ATTR_FACE_ID])
+                    if isinstance(face, dict):
+                        face_id = face.get("id")
+                        if face_id:
+                            face_ids.append(face_id)
+                            
+                            # Create comprehensive face detail for UI display
+                            face_detail = {
+                                "face_id": face_id,
+                                "quality_score": face.get("quality_score", 0),
+                                "confidence": face.get("confidence", 0),
+                                "face_crop_path": face.get("face_crop_path", ""),
+                                "thumbnail_path": face.get("thumbnail_path", ""),
+                                "created_at": face.get("created_at", ""),
+                                "visitor_event_id": face.get("visitor_event_id", ""),
+                                "original_image": face.get("original_image", ""),
+                                "ai_title": face.get("ai_title", ""),
+                                "timestamp": face.get("timestamp", ""),
+                                # Construct full image URLs for easy access
+                                "face_image_url": f"{self.coordinator.api_client.base_url}{face.get('face_crop_path', '')}" if face.get('face_crop_path') else None,
+                                "thumbnail_url": f"{self.coordinator.api_client.base_url}{face.get('thumbnail_path', '')}" if face.get('thumbnail_path') else None,
+                                "original_image_url": f"{self.coordinator.api_client.base_url}{face.get('original_image', '')}" if face.get('original_image') else None,
+                            }
+                            face_details.append(face_detail)
+                
                 attributes["face_ids"] = face_ids
+                attributes["face_details"] = face_details
+                
+                # Add quick labeling information
+                if face_details:
+                    attributes["next_face_to_label"] = face_details[0]  # Highest quality or most recent
+                    attributes["labeling_instructions"] = f"Use service whorang.label_face with face_id and person_name"
+                    
             else:
                 attributes[ATTR_REQUIRES_LABELING] = unknown_faces > 0 if isinstance(unknown_faces, int) else False
+        
+        # If no unknown faces in coordinator data, try to fetch them
+        if not attributes.get(ATTR_UNKNOWN_FACES):
+            try:
+                # This will trigger the service to fetch unknown faces
+                attributes["fetch_instruction"] = "Call service whorang.get_unknown_faces to populate this sensor"
+                attributes[ATTR_REQUIRES_LABELING] = False
+            except Exception as e:
+                _LOGGER.debug("No unknown faces data available: %s", e)
         
         return attributes
 

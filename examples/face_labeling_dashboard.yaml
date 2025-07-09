@@ -34,7 +34,56 @@ views:
             
             **Latest Detection:** {{ states('sensor.whorang_latest_face_detection') }}
             
-            Use the services below to label faces and improve recognition accuracy.
+            **Next Face to Label:** 
+            {% if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') %}
+            Face ID {{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id }} 
+            (Quality: {{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').quality_score }})
+            {% endif %}
+            
+            Use the face details below to view and label faces.
+
+      # Unknown Face Details Display
+      - type: conditional
+        conditions:
+          - entity: sensor.whorang_unknown_faces
+            state_not: "0"
+        card:
+          type: markdown
+          title: "Unknown Face Details"
+          content: |
+            {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+            {% if face_details %}
+            ## Faces Requiring Labeling:
+            
+            {% for face in face_details %}
+            ### Face ID: {{ face.face_id }}
+            - **Quality Score:** {{ face.quality_score }}
+            - **Confidence:** {{ face.confidence }}
+            - **Detected:** {{ face.created_at }}
+            - **Event:** {{ face.visitor_event_id }}
+            {% if face.ai_title %}
+            - **Context:** {{ face.ai_title }}
+            {% endif %}
+            {% if face.face_image_url %}
+            - **Face Image:** [View Face Crop]({{ face.face_image_url }})
+            {% endif %}
+            {% if face.original_image_url %}
+            - **Original Image:** [View Full Image]({{ face.original_image_url }})
+            {% endif %}
+            
+            **To label this face:**
+            1. Set Face ID to `{{ face.face_id }}` below
+            2. Enter the person's name
+            3. Click "Label Face"
+            
+            ---
+            {% endfor %}
+            
+            **Instructions:**
+            {{ state_attr('sensor.whorang_unknown_faces', 'labeling_instructions') }}
+            {% else %}
+            No face details available. Click "Refresh Unknown Faces" to load face data.
+            {% endif %}
 
       # Face Management Actions
       - type: entities
@@ -59,13 +108,47 @@ views:
               action: call-service
               service: whorang.get_face_similarities
               service_data:
-                face_id: 1  # Replace with actual face ID
+                face_id: "{{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') else 1 }}"
                 threshold: 0.6
                 limit: 10
 
-      # Manual Face Labeling Form
+      # Quick Face Labeling (Pre-filled with next face)
+      - type: conditional
+        conditions:
+          - entity: sensor.whorang_unknown_faces
+            state_not: "0"
+        card:
+          type: entities
+          title: "Quick Label Next Face"
+          entities:
+            - type: custom:text-input-row
+              entity: input_text.quick_person_name
+              name: "Person Name for Face ID {{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') else 'N/A' }}"
+              
+            - type: button
+              name: "Label Face {{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') else 'N/A' }}"
+              icon: mdi:tag
+              tap_action:
+                action: call-service
+                service: whorang.label_face
+                service_data:
+                  face_id: "{{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') else 1 }}"
+                  person_name: "{{ states('input_text.quick_person_name') }}"
+
+            - type: button
+              name: "Create New Person"
+              icon: mdi:account-plus
+              tap_action:
+                action: call-service
+                service: whorang.create_person_from_face
+                service_data:
+                  face_id: "{{ state_attr('sensor.whorang_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') else 1 }}"
+                  person_name: "{{ states('input_text.quick_person_name') }}"
+                  description: "Added via dashboard"
+
+      # Manual Face Labeling Form (for specific face IDs)
       - type: entities
-        title: Label Unknown Face
+        title: Manual Face Labeling
         entities:
           - type: input_number
             name: "Face ID"
@@ -95,6 +178,37 @@ views:
                 face_id: "{{ states('input_number.face_id_input') | int }}"
                 person_name: "{{ states('input_text.person_name_input') }}"
                 description: "Added via dashboard"
+
+          - type: button
+            name: "Delete Face"
+            icon: mdi:delete
+            tap_action:
+              action: call-service
+              service: whorang.delete_face
+              service_data:
+                face_id: "{{ states('input_number.face_id_input') | int }}"
+
+      # Face IDs Quick Reference
+      - type: conditional
+        conditions:
+          - entity: sensor.whorang_unknown_faces
+            state_not: "0"
+        card:
+          type: markdown
+          title: "Face IDs Quick Reference"
+          content: |
+            {% set face_ids = state_attr('sensor.whorang_unknown_faces', 'face_ids') %}
+            {% if face_ids %}
+            **Available Face IDs:** {{ face_ids | join(', ') }}
+            
+            **Quality Scores:**
+            {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+            {% for face in face_details %}
+            - Face {{ face.face_id }}: {{ face.quality_score }} ({{ 'High' if face.quality_score > 0.8 else 'Medium' if face.quality_score > 0.6 else 'Low' }} quality)
+            {% endfor %}
+            {% else %}
+            No face IDs available. Click "Refresh Unknown Faces" to load data.
+            {% endif %}
 
       # Face Statistics
       - type: entities
