@@ -1,0 +1,428 @@
+title: WhoRang Face Recognition
+views:
+  - title: Face Management
+    type: sections
+    max_columns: 3
+    dense_section_placement: true
+    header:
+      layout: responsive
+      badges_position: top
+      card:
+        type: markdown
+        content: |
+          # 🤖 WhoRang Face Recognition
+          **Stable Visual Face Management**
+    badges:
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_face_gallery
+        name: Gallery
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_unknown_faces
+        name: Unknown
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_known_faces
+        name: Known
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: binary_sensor.whorang_ai_doorbell_system_online
+        name: System
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_ai_provider
+        name: AI Provider
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: binary_sensor.whorang_ai_doorbell_ai_processing
+        name: Processing
+        show_name: true
+        show_state: true
+        show_icon: true
+    sections:
+      # System Status & Progress
+      - type: grid
+        title: System Status
+        cards:
+          - type: tile
+            entity: binary_sensor.whorang_ai_doorbell_system_online
+            name: System Status
+            icon: mdi:server
+            color: >
+              {% if is_state('binary_sensor.whorang_ai_doorbell_system_online', 'on') %}
+                green
+              {% else %}
+                red
+              {% endif %}
+          - type: tile
+            entity: sensor.whorang_ai_doorbell_ai_response_time
+            name: Response Time
+            icon: mdi:speedometer
+            color: >
+              {% set time = states('sensor.whorang_ai_doorbell_ai_response_time') | float(0) %}
+              {% if time < 5000 %}
+                green
+              {% elif time < 15000 %}
+                orange
+              {% else %}
+                red
+              {% endif %}
+          - type: tile
+            entity: sensor.whorang_ai_doorbell_face_gallery
+            name: Face Gallery
+            icon: mdi:view-gallery
+            color: blue
+
+      # Recognition Progress
+      - type: grid
+        title: Recognition Progress
+        cards:
+          - type: markdown
+            content: >
+              {% set unknown = states('sensor.whorang_ai_doorbell_unknown_faces') | int(0) %}
+              {% set known = states('sensor.whorang_ai_doorbell_known_faces') | int(0) %}
+              {% set total = unknown + known %}
+              {% set progress = (known / total * 100) if total > 0 else 100 %}
+              
+              ## 📊 Face Recognition Progress
+              
+              **{{ progress | round(0) }}%** Complete
+              
+              - **{{ unknown }}** faces need labeling
+              - **{{ known }}** people recognized
+              - **{{ total }}** total faces detected
+              
+              {% if unknown > 0 %}
+              **⚠️ Action Required:** {{ unknown }} unknown face{{ 's' if unknown != 1 else '' }}
+              {% else %}
+              **✅ All faces labeled!**
+              {% endif %}
+
+      # Latest Detection
+      - type: grid
+        title: Latest Detection
+        cards:
+          - type: tile
+            entity: sensor.whorang_ai_doorbell_latest_face_detection
+            name: Latest Detection
+            icon: mdi:face-man
+            color: blue
+          - type: picture-entity
+            entity: camera.whorang_ai_doorbell_latest_image
+            name: Latest Image
+            show_state: false
+            show_name: false
+            tap_action:
+              action: more-info
+
+      # Face Management - Unknown Faces
+      - type: grid
+        title: Unknown Faces Management
+        cards:
+          - type: heading
+            heading: Unknown Faces Requiring Labeling
+            heading_style: subtitle
+            icon: mdi:face-recognition
+          - type: markdown
+            content: >
+              {% set unknown_faces = state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'face_details') or [] %}
+              {% if unknown_faces | length == 0 %}
+              ## 🎉 No Unknown Faces!
+              
+              All detected faces have been labeled. Great job!
+              
+              **Tip:** New unknown faces will appear here automatically when detected.
+              {% else %}
+              ## 👤 {{ unknown_faces | length }} Face{{ 's' if unknown_faces | length != 1 else '' }} Need Labeling
+              
+              {% for face in unknown_faces[:5] %}
+              **Face {{ face.face_id }}:**
+              - Quality: {{ (face.quality_score * 100) | round(0) }}%
+              - Detected: {{ face.created_at }}
+              {% if face.face_image_url %}
+              - [View Image]({{ face.face_image_url }})
+              {% endif %}
+              
+              {% endfor %}
+              
+              {% if unknown_faces | length > 5 %}
+              *... and {{ unknown_faces | length - 5 }} more faces*
+              {% endif %}
+              {% endif %}
+          
+          # Quick Actions for Unknown Faces
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: button
+                name: Refresh Faces
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: whorang.get_unknown_faces
+                  service_data:
+                    limit: 50
+                    quality_threshold: 0.6
+              - type: button
+                name: View All Details
+                icon: mdi:information
+                tap_action:
+                  action: more-info
+                  entity_id: sensor.whorang_ai_doorbell_unknown_faces
+
+      # Face Labeling Interface
+      - type: grid
+        title: Face Labeling
+        cards:
+          - type: markdown
+            content: >
+              ## 🏷️ Label Faces
+              
+              Use the controls below to label unknown faces with person names.
+              
+              **Instructions:**
+              1. Set the Face ID (from unknown faces list above)
+              2. Enter the person's name
+              3. Click "Label Face" to assign
+              
+              **Tip:** You can also use batch labeling to assign multiple faces to the same person.
+          
+          - type: entities
+            entities:
+              - type: input_number
+                name: Face ID to Label
+                entity: input_number.face_id_input
+                icon: mdi:identifier
+              - type: input_text
+                name: Person Name
+                entity: input_text.person_name_input
+                icon: mdi:account
+          
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: button
+                name: Label Face
+                icon: mdi:tag
+                tap_action:
+                  action: call-service
+                  service: whorang.label_face
+                  service_data:
+                    face_id: '{{ states("input_number.face_id_input") | int }}'
+                    person_name: '{{ states("input_text.person_name_input") }}'
+              - type: button
+                name: Create Person
+                icon: mdi:account-plus
+                tap_action:
+                  action: call-service
+                  service: whorang.create_person_from_face
+                  service_data:
+                    face_id: '{{ states("input_number.face_id_input") | int }}'
+                    person_name: '{{ states("input_text.person_name_input") }}'
+                    description: Added via dashboard
+
+      # Known Persons
+      - type: grid
+        title: Known People
+        cards:
+          - type: heading
+            heading: Recognized People
+            heading_style: subtitle
+            icon: mdi:account-group
+          - type: markdown
+            content: >
+              {% set known_persons = state_attr('sensor.whorang_ai_doorbell_known_faces', 'persons') or [] %}
+              {% if known_persons | length == 0 %}
+              ## 👥 No Known People Yet
+              
+              Once you label faces, recognized people will appear here.
+              {% else %}
+              ## 👥 {{ known_persons | length }} Recognized People
+              
+              {% for person in known_persons %}
+              **{{ person.name }}**
+              - Face Count: {{ person.face_count }}
+              - Last Seen: {{ person.last_seen or 'Never' }}
+              
+              {% endfor %}
+              {% endif %}
+          
+          - type: entities
+            entities:
+              - sensor.whorang_ai_doorbell_known_faces
+              - sensor.whorang_ai_doorbell_unknown_faces
+              - sensor.whorang_ai_doorbell_latest_face_detection
+
+      # Batch Operations
+      - type: grid
+        title: Batch Operations
+        cards:
+          - type: markdown
+            content: >
+              ## 🔄 Batch Labeling
+              
+              Efficiently label multiple faces of the same person.
+              
+              **Warning:** This will label ALL unknown faces with the same name.
+              Use with caution!
+          
+          - type: entities
+            entities:
+              - type: input_text
+                name: Batch Person Name
+                entity: input_text.batch_person_name
+                icon: mdi:account-multiple
+          
+          - type: button
+            name: Label All Unknown Faces
+            icon: mdi:tag-multiple
+            tap_action:
+              action: call-service
+              service: whorang.batch_label_faces
+              service_data:
+                face_ids: >-
+                  {% set face_details = state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'face_ids') or [] %}
+                  {{ face_details }}
+                person_name: '{{ states("input_text.batch_person_name") }}'
+            confirmation:
+              text: "Are you sure you want to label ALL unknown faces as '{{ states('input_text.batch_person_name') }}'?"
+
+      # System Controls
+      - type: grid
+        title: System Controls
+        cards:
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: button
+                entity: button.whorang_ai_doorbell_refresh_data
+                name: Refresh Data
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  target:
+                    entity_id: button.whorang_ai_doorbell_refresh_data
+              - type: button
+                entity: button.whorang_ai_doorbell_test_webhook
+                name: Test Connection
+                icon: mdi:connection
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  target:
+                    entity_id: button.whorang_ai_doorbell_test_webhook
+              - type: button
+                entity: button.whorang_ai_doorbell_trigger_analysis
+                name: Trigger Analysis
+                icon: mdi:brain
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  target:
+                    entity_id: button.whorang_ai_doorbell_trigger_analysis
+              - type: button
+                name: Delete Face
+                icon: mdi:delete
+                tap_action:
+                  action: call-service
+                  service: whorang.delete_face
+                  service_data:
+                    face_id: '{{ states("input_number.face_id_input") | int }}'
+                confirmation:
+                  text: "Are you sure you want to delete face {{ states('input_number.face_id_input') }}?"
+
+      # AI Configuration
+      - type: grid
+        title: AI Configuration
+        cards:
+          - type: entities
+            entities:
+              - select.whorang_ai_doorbell_ai_provider
+              - select.whorang_ai_doorbell_ai_model
+              - switch.whorang_ai_doorbell_face_processing
+              - switch.whorang_ai_doorbell_ai_processing
+          
+          - type: markdown
+            content: >
+              ## ⚙️ AI Settings
+              
+              **Current Provider:** {{ states('select.whorang_ai_doorbell_ai_provider') }}
+              **Current Model:** {{ states('select.whorang_ai_doorbell_ai_model') }}
+              **Face Processing:** {{ 'Enabled' if is_state('switch.whorang_ai_doorbell_face_processing', 'on') else 'Disabled' }}
+              **AI Processing:** {{ 'Enabled' if is_state('switch.whorang_ai_doorbell_ai_processing', 'on') else 'Disabled' }}
+
+      # Statistics & Costs
+      - type: grid
+        title: Statistics & Costs
+        cards:
+          - type: entities
+            entities:
+              - sensor.whorang_ai_doorbell_visitors_today
+              - sensor.whorang_ai_doorbell_visitors_this_week
+              - sensor.whorang_ai_doorbell_visitors_this_month
+              - sensor.whorang_ai_doorbell_ai_cost_today
+              - sensor.whorang_ai_doorbell_ai_cost_this_month
+          
+          - type: markdown
+            content: >
+              ## 📊 Usage Statistics
+              
+              **Today:** {{ states('sensor.whorang_ai_doorbell_visitors_today') }} visitors
+              **This Week:** {{ states('sensor.whorang_ai_doorbell_visitors_this_week') }} visitors
+              **This Month:** {{ states('sensor.whorang_ai_doorbell_visitors_this_month') }} visitors
+              
+              ## 💰 AI Costs
+              
+              **Today:** ${{ states('sensor.whorang_ai_doorbell_ai_cost_today') }}
+              **This Month:** ${{ states('sensor.whorang_ai_doorbell_ai_cost_this_month') }}
+              
+              **Response Time:** {{ states('sensor.whorang_ai_doorbell_ai_response_time') }}ms
+
+      # Setup Instructions
+      - type: grid
+        title: Setup Instructions
+        cards:
+          - type: markdown
+            content: |
+              ## 🔧 Required Input Helpers
+              
+              Create these helpers in Home Assistant:
+              
+              **Settings → Devices & Services → Helpers**
+              
+              ### Text Helpers
+              1. **Person Name Input** (ID: `person_name_input`)
+              2. **Batch Person Name** (ID: `batch_person_name`)
+              
+              ### Number Helper
+              1. **Face ID Input** (ID: `face_id_input`)
+                 - Min: 1, Max: 9999, Step: 1
+              
+              ## 📱 Usage Instructions
+              
+              1. **View Unknown Faces:** Check the list above for faces needing labels
+              2. **Label Individual Face:** Set Face ID → Enter Name → Click "Label Face"
+              3. **Batch Label:** Enter name → Click "Label All Unknown Faces"
+              4. **View Images:** Click image links to see face crops
+              5. **Monitor Progress:** Check the progress section for completion status
+              
+              ## 💡 Tips
+              
+              - **Refresh regularly** to get latest face data
+              - **Use batch labeling** for multiple faces of same person
+              - **Check image quality** before labeling (higher is better)
+              - **Monitor AI costs** to stay within budget
