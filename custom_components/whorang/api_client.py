@@ -912,7 +912,98 @@ class WhoRangAPIClient:
         try:
             # The backend should provide face crop URLs in the face data
             # This is a helper method to construct the URL
-            return f"{self.base_url}/api/detected-faces/{face_id}/image"
+            return f"{self.base_url}/api/faces/{face_id}/image"
         except Exception as e:
             _LOGGER.error("Failed to get face image URL for %s: %s", face_id, e)
             return None
+
+    async def get_face_gallery(self) -> Dict[str, Any]:
+        """Get face gallery data with image URLs."""
+        try:
+            response = await self._request("GET", "/api/faces/gallery")
+            return response.get("data", {
+                "unknown_faces": [],
+                "known_persons": [],
+                "statistics": {
+                    "total_unknown": 0,
+                    "total_known_persons": 0,
+                    "total_labeled_faces": 0,
+                    "labeling_progress": 100
+                }
+            })
+        except Exception as e:
+            _LOGGER.error("Failed to get face gallery: %s", e)
+            return {
+                "unknown_faces": [],
+                "known_persons": [],
+                "statistics": {
+                    "total_unknown": 0,
+                    "total_known_persons": 0,
+                    "total_labeled_faces": 0,
+                    "labeling_progress": 100
+                }
+            }
+
+    async def get_face_suggestions(self, face_id: int) -> List[Dict[str, Any]]:
+        """Get name suggestions for a face based on similarity."""
+        try:
+            response = await self._request("GET", f"/api/faces/{face_id}/suggestions")
+            return response.get("data", [])
+        except Exception as e:
+            _LOGGER.error("Failed to get face suggestions for %s: %s", face_id, e)
+            return []
+
+    async def label_face(self, face_id: int, person_name: str, create_person: bool = True) -> bool:
+        """Label a single face with a person name."""
+        try:
+            data = {
+                "person_name": person_name,
+                "create_person": create_person
+            }
+            response = await self._request("POST", f"/api/faces/{face_id}/label", data=data)
+            return response.get("success", False)
+        except Exception as e:
+            _LOGGER.error("Failed to label face %s with name %s: %s", face_id, person_name, e)
+            return False
+
+    async def batch_label_faces(self, face_ids: List[int], person_name: str, create_person: bool = True) -> Dict[str, Any]:
+        """Label multiple faces with the same person name."""
+        try:
+            data = {
+                "face_ids": face_ids,
+                "person_name": person_name,
+                "create_person": create_person
+            }
+            response = await self._request("POST", "/api/faces/batch-label", data=data)
+            return response.get("data", {
+                "labeled_count": 0,
+                "total_requested": len(face_ids),
+                "results": []
+            })
+        except Exception as e:
+            _LOGGER.error("Failed to batch label faces %s with name %s: %s", face_ids, person_name, e)
+            return {
+                "labeled_count": 0,
+                "total_requested": len(face_ids),
+                "results": [],
+                "error": str(e)
+            }
+
+    async def delete_face_by_id(self, face_id: int) -> bool:
+        """Delete a face by ID."""
+        try:
+            response = await self._request("DELETE", f"/api/faces/{face_id}")
+            return response.get("success", False)
+        except Exception as e:
+            _LOGGER.error("Failed to delete face %s: %s", face_id, e)
+            return False
+
+    async def refresh_face_gallery(self) -> bool:
+        """Refresh face gallery data (trigger backend to reload)."""
+        try:
+            # This could trigger a refresh or just return current data
+            response = await self.get_face_gallery()
+            return response is not None
+        except Exception as e:
+            _LOGGER.error("Failed to refresh face gallery: %s", e)
+            return False

@@ -2,8 +2,8 @@ title: WhoRang Face Management
 views:
   - title: Face Management
     type: sections
-    max_columns: 3
-    dense_section_placement: false
+    max_columns: 4
+    dense_section_placement: true
     header:
       layout: responsive
       badges_position: top
@@ -14,323 +14,187 @@ views:
           **Intelligent face recognition and visitor management**
     badges:
       - type: entity
-        entity: binary_sensor.whorang_system_online
+        entity: binary_sensor.whorang_ai_doorbell_system_online
         name: System
         show_name: true
         show_state: true
+        show_icon: true
       - type: entity
-        entity: sensor.whorang_ai_provider
+        entity: sensor.whorang_ai_doorbell_ai_provider
         name: AI Provider
         show_name: true
         show_state: true
+        show_icon: true
       - type: entity
-        entity: binary_sensor.whorang_ai_processing
+        entity: binary_sensor.whorang_ai_doorbell_ai_processing
         name: Processing
         show_name: true
         show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_visitors_today
+        name: Today
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_visitors_this_week
+        name: Week
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_visitors_this_month
+        name: Month
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_known_faces
+        name: Known
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_unknown_faces
+        name: Unknown
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_ai_cost_today
+        name: Cost Today
+        show_name: true
+        show_state: true
+        show_icon: true
+      - type: entity
+        entity: sensor.whorang_ai_doorbell_ai_cost_this_month
+        name: Cost Month
+        show_name: true
+        show_state: true
+        show_icon: true
     sections:
+      # System Status - Compact
       - type: grid
+        title: System Status
         cards:
-          - type: heading
-            heading: System Status
-          - type: heading
-            heading: System Overview
-            heading_style: title
-            icon: mdi:cog
           - type: tile
-            entity: sensor.whorang_system_status
+            entity: sensor.whorang_ai_doorbell_system_status
             name: System Status
             icon: mdi:server
             color: >
-              {% if is_state('sensor.whorang_system_status', 'online') %}
+              {% if is_state('sensor.whorang_ai_doorbell_system_status', 'online') %}
                 green
               {% else %}
                 red
               {% endif %}
           - type: tile
-            entity: sensor.whorang_ai_provider
-            name: AI Provider
-            icon: mdi:brain
-            color: blue
-          - type: tile
-            entity: sensor.whorang_ai_response_time
+            entity: sensor.whorang_ai_doorbell_ai_response_time
             name: Response Time
             icon: mdi:speedometer
             color: >
-              {% set time = states('sensor.whorang_ai_response_time') | float(0) %}
-              {% if time < 2 %}
+              {% set time = states('sensor.whorang_ai_doorbell_ai_response_time') | float(0) %}
+              {% if time < 2000 %}
                 green
-              {% elif time < 5 %}
+              {% elif time < 5000 %}
                 orange
               {% else %}
                 red
               {% endif %}
+
+      # Latest Detection - Compact
       - type: grid
+        title: Latest Detection
         cards:
-          - type: heading
-            heading: Face Analytics
-          - type: heading
-            heading: Detection Analytics
-            heading_style: title
-            icon: mdi:chart-line
           - type: tile
-            entity: sensor.whorang_visitors_today
-            name: Visitors Today
-            icon: mdi:account-clock
-            color: blue
-          - type: tile
-            entity: sensor.whorang_visitors_this_week
-            name: This Week
-            icon: mdi:calendar-week
-            color: green
-          - type: tile
-            entity: sensor.whorang_visitors_this_month
-            name: This Month
-            icon: mdi:calendar-month
-            color: purple
-          - type: tile
-            entity: sensor.whorang_known_faces
-            name: Known Faces
-            icon: mdi:account-group
-            color: green
-          - type: tile
-            entity: sensor.whorang_latest_face_detection
+            entity: sensor.whorang_ai_doorbell_latest_face_detection
             name: Latest Detection
             icon: mdi:face-man
             color: blue
+          - type: picture-entity
+            entity: camera.whorang_latest_image
+            name: Latest Image
+            show_state: false
+            show_name: false
+            tap_action:
+              action: more-info
+
+      # Face Management - Always Visible
       - type: grid
-        visibility:
-          - condition: numeric_state
-            entity: sensor.whorang_unknown_faces
-            above: 0
+        title: Face Management
         cards:
           - type: heading
-            heading: Attention Required
-          - type: heading
-            heading: Unknown Faces Detected
-            heading_style: title
-            icon: mdi:alert-circle
-          - type: tile
-            entity: sensor.whorang_unknown_faces
-            name: Unknown Faces
+            heading: Unknown Faces
+            heading_style: subtitle
             icon: mdi:face-recognition
-            color: orange
-            features:
-              - type: numeric-input
-                style: buttons
           - type: markdown
             content: >
-              ## ⚠️ Action Required
-
-
-              **{{ states('sensor.whorang_unknown_faces') }}**
-              unknown face(s) need labeling.
-
-
-              **Latest Detection:** {{
-              states('sensor.whorang_latest_face_detection') }}
-
-
-              {% if state_attr('sensor.whorang_unknown_faces',
-              'next_face_to_label') %}
-
-              **Next Face:** ID {{
-              state_attr('sensor.whorang_unknown_faces',
-              'next_face_to_label').face_id }} 
-
-              (Quality: {{
-              state_attr('sensor.whorang_unknown_faces',
-              'next_face_to_label').quality_score }})
-
-              {% endif %}
-          - type: button
-            name: Refresh Unknown Faces
-            icon: mdi:refresh
-            tap_action:
-              action: call-service
-              service: whorang.get_unknown_faces
-              service_data:
-                limit: 50
-                quality_threshold: 0.6
-            hold_action:
-              action: more-info
-      - type: grid
-        visibility:
-          - condition: numeric_state
-            entity: sensor.whorang_unknown_faces
-            above: 0
-        cards:
-          - type: heading
-            heading: Face Details
-          - type: heading
-            heading: Detailed Face Information
-            heading_style: subtitle
-            icon: mdi:information
-          - type: markdown
-            content: >
-              {% set face_details =
-              state_attr('sensor.whorang_unknown_faces',
-              'face_details') %}
-
-              {% if face_details %}
-
-              ## Faces Requiring Labeling:
-
-
-              {% for face in face_details %}
-
-              ### 🆔 Face ID: {{ face.face_id }}
-
-
-              | Property | Value |
-
-              |----------|-------|
-
-              | **Quality Score** | {{ face.quality_score }} ({{ 'High' if
-              face.quality_score > 0.8 else 'Medium' if face.quality_score > 0.6
-              else 'Low' }}) |
-
-              | **Confidence** | {{ face.confidence }}% |
-
-              | **Detected** | {{ face.created_at }} |
-
-              | **Event ID** | {{ face.visitor_event_id }} |
-
-              {% if face.ai_title %}| **Context** | {{ face.ai_title }} |{%
-              endif %}
-
-
-              {% if face.face_image_url %}
-
-              **🖼️ [View Face Crop]({{ face.face_image_url }})**
-
-              {% endif %}
-
-              {% if face.original_image_url %}
-
-              **📷 [View Full Image]({{ face.original_image_url }})**
-
-              {% endif %}
-
-
-              ---
-
-              {% endfor %}
-
-
-              **💡 Instructions:** {{
-              state_attr('sensor.whorang_unknown_faces',
-              'labeling_instructions') }}
-
-              {% else %}
-
-              **No face details available.** Click "Refresh Unknown Faces" to
-              load data.
-
-              {% endif %}
-      - type: grid
-        visibility:
-          - condition: numeric_state
-            entity: sensor.whorang_unknown_faces
-            above: 0
-        cards:
-          - type: heading
-            heading: Quick Actions
-          - type: heading
-            heading: Quick Label Next Face
-            heading_style: subtitle
-            icon: mdi:lightning-bolt
-          - type: markdown
-            content: >
-              **Note:** The input_text.quick_person_name entity needs to be created as a helper.
+              **Unknown Faces:** {{ states('sensor.whorang_ai_doorbell_unknown_faces') }}
               
-              Go to Settings → Devices & Services → Helpers → Create Helper → Text
-              
-              Name: "Quick Person Name", Entity ID: quick_person_name
-          - type: button
-            name: >-
-              🏷️ Label Next Face
-            icon: mdi:tag
-            tap_action:
-              action: call-service
-              service: whorang.label_face
-              service_data:
-                face_id: >-
-                  {{ state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label').face_id if
-                  state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label') else 1 }}
-                person_name: '{{ states(''input_text.quick_person_name'') }}'
-            hold_action:
-              action: more-info
-          - type: button
-            name: ➕ Create New Person
-            icon: mdi:account-plus
-            tap_action:
-              action: call-service
-              service: whorang.create_person_from_face
-              service_data:
-                face_id: >-
-                  {{ state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label').face_id if
-                  state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label') else 1 }}
-                person_name: '{{ states(''input_text.quick_person_name'') }}'
-                description: Added via dashboard
-            hold_action:
-              action: more-info
-          - type: button
-            name: 🔍 Get Face Similarities
-            icon: mdi:face-recognition
-            tap_action:
-              action: call-service
-              service: whorang.get_face_similarities
-              service_data:
-                face_id: >-
-                  {{ state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label').face_id | int if
-                  state_attr('sensor.whorang_unknown_faces',
-                  'next_face_to_label') else 1 }}
-                threshold: 0.6
-                limit: 10
-            hold_action:
-              action: more-info
-      - type: grid
-        cards:
-          - type: heading
-            heading: Manual Management
-          - type: heading
-            heading: Advanced Face Management
-            heading_style: subtitle
-            icon: mdi:cog-outline
-          - type: tile
-            entity: input_number.face_id_input
-            name: Face ID
-            icon: mdi:identifier
-            features:
-              - type: numeric-input
-                style: buttons
-          - type: tile
-            entity: input_text.person_name_input
-            name: Person Name
-            icon: mdi:account-edit
-            features:
-              - type: text-input
+              {% if state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label') %}
+              **Next:** ID {{ state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label').face_id }}
+              (Quality: {{ state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label').quality_score }})
+              {% endif %}
           - type: grid
-            square: false
             columns: 2
+            square: false
             cards:
               - type: button
-                name: Label Face
+                name: Refresh
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: whorang.get_unknown_faces
+                  service_data:
+                    limit: 50
+                    quality_threshold: 0.6
+              - type: button
+                name: Label Next
                 icon: mdi:tag
                 tap_action:
                   action: call-service
                   service: whorang.label_face
                   service_data:
-                    face_id: '{{ states(''input_number.face_id_input'') | int }}'
-                    person_name: '{{ states(''input_text.person_name_input'') }}'
-                hold_action:
-                  action: more-info
+                    face_id: >-
+                      {{ state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label') else 1 }}
+                    person_name: '{{ states(''input_text.quick_person_name'') }}'
+
+      # Face Details - Always Visible
+      - type: grid
+        title: Face Details
+        cards:
+          - type: markdown
+            content: >
+              {% set face_details = state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'face_details') %}
+              {% if face_details %}
+              ## Faces Requiring Labeling:
+              {% for face in face_details %}
+              **Face {{ face.face_id }}:** Quality {{ face.quality_score }} ({{ 'High' if face.quality_score > 0.8 else 'Medium' if face.quality_score > 0.6 else 'Low' }})
+              {% endfor %}
+              
+              **💡 Tip:** Create helpers for quick labeling
+              {% else %}
+              **No unknown faces.** All faces are labeled!
+              {% endif %}
+
+      # Quick Actions - Compact
+      - type: grid
+        title: Quick Actions
+        cards:
+          - type: markdown
+            content: >
+              **Setup Required:**
+              
+              Create helpers: Settings → Helpers → Text
+              - "Quick Person Name" (ID: `quick_person_name`)
+              - "Person Name Input" (ID: `person_name_input`)
+              
+              Create helper: Settings → Helpers → Number
+              - "Face ID Input" (ID: `face_id_input`)
+          - type: grid
+            columns: 2
+            square: false
+            cards:
               - type: button
                 name: Create Person
                 icon: mdi:account-plus
@@ -338,13 +202,48 @@ views:
                   action: call-service
                   service: whorang.create_person_from_face
                   service_data:
+                    face_id: >-
+                      {{ state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label').face_id if state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label') else 1 }}
+                    person_name: '{{ states(''input_text.quick_person_name'') }}'
+                    description: Added via dashboard
+              - type: button
+                name: Similarities
+                icon: mdi:face-recognition
+                tap_action:
+                  action: call-service
+                  service: whorang.get_face_similarities
+                  service_data:
+                    face_id: >-
+                      {{ state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label').face_id | int if state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'next_face_to_label') else 1 }}
+                    threshold: 0.6
+                    limit: 10
+
+      # Manual Management - Compact
+      - type: grid
+        title: Manual Management
+        cards:
+          - type: tile
+            entity: input_number.face_id_input
+            name: Face ID
+            icon: mdi:identifier
+            features:
+              - type: numeric-input
+                style: buttons
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: button
+                name: Label
+                icon: mdi:tag
+                tap_action:
+                  action: call-service
+                  service: whorang.label_face
+                  service_data:
                     face_id: '{{ states(''input_number.face_id_input'') | int }}'
                     person_name: '{{ states(''input_text.person_name_input'') }}'
-                    description: Added via dashboard
-                hold_action:
-                  action: more-info
               - type: button
-                name: Delete Face
+                name: Delete
                 icon: mdi:delete
                 tap_action:
                   action: call-service
@@ -353,103 +252,44 @@ views:
                     face_id: '{{ states(''input_number.face_id_input'') | int }}'
                 confirmation:
                   text: Are you sure you want to delete this face?
-                hold_action:
-                  action: more-info
               - type: button
-                name: Test Connection
+                name: Create
+                icon: mdi:account-plus
+                tap_action:
+                  action: call-service
+                  service: whorang.create_person_from_face
+                  service_data:
+                    face_id: '{{ states(''input_number.face_id_input'') | int }}'
+                    person_name: '{{ states(''input_text.person_name_input'') }}'
+                    description: Added via dashboard
+              - type: button
+                name: Test
                 icon: mdi:connection
                 tap_action:
                   action: call-service
                   service: button.press
                   target:
                     entity_id: button.whorang_ai_doorbell_test_connection
-                hold_action:
-                  action: more-info
+
+      # Quality Guide - Always Visible
       - type: grid
-        visibility:
-          - condition: numeric_state
-            entity: sensor.whorang_unknown_faces
-            above: 0
+        title: Quality Guide
         cards:
-          - type: heading
-            heading: Quick Reference
-          - type: heading
-            heading: Face IDs & Quality Scores
-            heading_style: subtitle
-            icon: mdi:format-list-numbered
           - type: markdown
             content: >
-              {% set face_ids =
-              state_attr('sensor.whorang_unknown_faces', 'face_ids')
-              %}
-
+              {% set face_ids = state_attr('sensor.whorang_ai_doorbell_unknown_faces', 'face_ids') %}
               {% if face_ids %}
-
-              ## 📋 Available Face IDs
-
-              **IDs:** {{ face_ids | join(', ') }}
-
-
-              ## 📊 Quality Assessment
-
-              {% set face_details =
-              state_attr('sensor.whorang_unknown_faces',
-              'face_details') %}
-
-              {% for face in face_details %}
-
-              - **Face {{ face.face_id }}:** {{ face.quality_score }} 
-                {% if face.quality_score > 0.8 %}🟢 High{% elif face.quality_score > 0.6 %}🟡 Medium{% else %}🔴 Low{% endif %}
-              {% endfor %}
-
-
-              ## 🎯 Quality Guide
-
-              - **🟢 High (>0.8):** Excellent for recognition
-
-              - **🟡 Medium (0.6-0.8):** Good for recognition  
-
-              - **🔴 Low (<0.6):** May need manual review
-
+              **Available IDs:** {{ face_ids | join(', ') }}
               {% else %}
-
-              **No face IDs available.** Click "Refresh Unknown Faces" to load
-              data.
-
+              **No face IDs available**
               {% endif %}
-      - type: grid
-        cards:
-          - type: heading
-            heading: System Monitoring
-          - type: heading
-            heading: Performance & Costs
-            heading_style: subtitle
-            icon: mdi:monitor-dashboard
-          - type: tile
-            entity: sensor.whorang_ai_cost_today
-            name: AI Cost Today
-            icon: mdi:currency-usd
-            color: >
-              {% set cost = states('sensor.whorang_ai_cost_today') |
-              float(0) %} {% if cost == 0 %}
-                green
-              {% elif cost < 1 %}
-                orange
-              {% else %}
-                red
-              {% endif %}
-          - type: tile
-            entity: sensor.whorang_ai_cost_this_month
-            name: AI Cost This Month
-            icon: mdi:chart-line
-            color: blue
-          - type: tile
-            entity: sensor.whorang_ai_response_time
-            name: Last Analysis
-            icon: mdi:clock-outline
-            color: grey
-          - type: camera
-            entity: camera.whorang_latest_image
-            name: Latest Visitor Image
-            show_state: false
-            camera_view: live
+              
+              ## Quality Scale:
+              - 🟢 **High (>0.8):** Excellent
+              - 🟡 **Medium (0.6-0.8):** Good  
+              - 🔴 **Low (<0.6):** Review needed
+              
+              ## Quick Commands:
+              - Use "Refresh" to load unknown faces
+              - Use "Label Next" for quick labeling
+              - Use manual controls for specific faces
