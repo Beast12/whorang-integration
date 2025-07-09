@@ -33,6 +33,7 @@ from .const import (
     SERVICE_TEST_WEBHOOK,
     SERVICE_PROCESS_DOORBELL_EVENT,
     SERVICE_LABEL_FACE,
+    SERVICE_BATCH_LABEL_FACES,
     SERVICE_CREATE_PERSON_FROM_FACE,
     SERVICE_GET_UNKNOWN_FACES,
     SERVICE_DELETE_FACE,
@@ -122,6 +123,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register frontend resources for custom cards
+    await _async_register_frontend_resources(hass)
+
     # Register services
     await _async_register_services(hass)
 
@@ -129,6 +133,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(async_update_options))
 
     return True
+
+
+async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
+    """Register frontend resources for custom cards."""
+    try:
+        # Register static path for custom cards
+        hass.http.register_static_path(
+            "/whorang-face-manager",
+            hass.config.path("custom_components/whorang/www"),
+            True
+        )
+        
+        # Add frontend resources to Lovelace
+        frontend_url = "/whorang-face-manager/whorang-face-manager.js"
+        
+        # Register the card with frontend
+        hass.components.frontend.add_extra_js_url(frontend_url)
+        
+        _LOGGER.info("Registered WhoRang Face Manager custom card at %s", frontend_url)
+        
+    except Exception as err:
+        _LOGGER.warning("Failed to register frontend resources: %s", err)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -475,6 +501,44 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             except Exception as err:
                 _LOGGER.error("Error labeling face %s: %s", face_id, err)
 
+    async def batch_label_faces_service(call) -> None:
+        """Handle batch label faces service call."""
+        face_ids = call.data.get("face_ids", [])
+        person_name = call.data.get("person_name")
+        create_person = call.data.get("create_person", True)
+        
+        if not face_ids or not person_name:
+            _LOGGER.error("Face IDs list and person name are required for batch labeling faces")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                result = await coordinator.api_client.batch_label_faces(face_ids, person_name, create_person)
+                labeled_count = result.get("labeled_count", 0)
+                
+                if labeled_count > 0:
+                    _LOGGER.info("Successfully batch labeled %d faces as %s", labeled_count, person_name)
+                    await coordinator.async_request_refresh()
+                    
+                    # Fire event for automations
+                    hass.bus.async_fire(EVENT_FACE_LABELED, {
+                        "face_ids": face_ids,
+                        "person_name": person_name,
+                        "labeled_count": labeled_count,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    _LOGGER.error("Failed to batch label faces as %s", person_name)
+                    
+            except Exception as err:
+                _LOGGER.error("Error batch labeling faces: %s", err)
+
     async def create_person_from_face_service(call) -> None:
         """Handle create person from face service call."""
         face_id = call.data.get("face_id")
@@ -731,6 +795,17 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         schema=vol.Schema({
             vol.Required("face_id"): int,
             vol.Required("person_name"): str,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_BATCH_LABEL_FACES,
+        batch_label_faces_service,
+        schema=vol.Schema({
+            vol.Required("face_ids"): [int],
+            vol.Required("person_name"): str,
+            vol.Optional("create_person", default=True): bool,
         }),
     )
 
