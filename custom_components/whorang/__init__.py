@@ -138,10 +138,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
     """Register frontend resources for custom cards."""
     try:
+        import os
+        
+        # Get the correct path to the www directory
+        integration_dir = os.path.dirname(__file__)
+        www_dir = os.path.join(integration_dir, "www")
+        
+        _LOGGER.info("Registering frontend resources from: %s", www_dir)
+        
         # Register static path for custom cards
         hass.http.register_static_path(
             "/whorang-face-manager",
-            hass.config.path("custom_components/whorang/www"),
+            www_dir,
             True
         )
         
@@ -151,10 +159,19 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
         # Register the card with frontend
         hass.components.frontend.add_extra_js_url(frontend_url)
         
-        _LOGGER.info("Registered WhoRang Face Manager custom card at %s", frontend_url)
+        _LOGGER.info("Successfully registered WhoRang Face Manager custom card at %s", frontend_url)
+        
+        # Also try to register with the resource manager
+        try:
+            await hass.components.lovelace.async_register_resource(
+                frontend_url, "module"
+            )
+            _LOGGER.info("Also registered with Lovelace resource manager")
+        except Exception as resource_err:
+            _LOGGER.debug("Could not register with Lovelace resource manager: %s", resource_err)
         
     except Exception as err:
-        _LOGGER.warning("Failed to register frontend resources: %s", err)
+        _LOGGER.error("Failed to register frontend resources: %s", err)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
