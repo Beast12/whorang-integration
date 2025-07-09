@@ -99,7 +99,7 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
             self._known_persons = {person["id"]: person for person in known_persons}
             
             # Get face gallery data for visual face management
-            face_gallery_data = await self.api_client.get_face_gallery()
+            face_gallery_data = await self.api_client.get_face_gallery_data()
             
             # Get AI usage stats if cost tracking is enabled
             ai_usage = await self.api_client.get_ai_usage_stats(days=1)

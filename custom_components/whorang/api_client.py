@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import ssl
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import aiohttp
@@ -917,32 +918,83 @@ class WhoRangAPIClient:
             _LOGGER.error("Failed to get face image URL for %s: %s", face_id, e)
             return None
 
-    async def get_face_gallery(self) -> Dict[str, Any]:
-        """Get face gallery data with image URLs."""
+    async def get_face_gallery_data(self) -> Dict[str, Any]:
+        """Get comprehensive face gallery data with proper image URLs."""
         try:
-            response = await self._request("GET", "/api/faces/gallery")
-            return response.get("data", {
-                "unknown_faces": [],
-                "known_persons": [],
-                "statistics": {
-                    "total_unknown": 0,
-                    "total_known_persons": 0,
-                    "total_labeled_faces": 0,
-                    "labeling_progress": 100
+            # Get unknown faces with image URLs
+            unknown_response = await self._request("GET", "/api/detected-faces/unassigned")
+            unknown_faces = unknown_response.get("faces", [])
+            
+            # Get known persons
+            persons_response = await self._request("GET", "/api/faces/persons")
+            known_persons = persons_response.get("data", [])
+            
+            # Build face gallery data with proper URLs
+            base_url = self.base_url
+            
+            processed_unknown = []
+            for face in unknown_faces:
+                face_data = {
+                    "id": face.get("id"),
+                    "image_url": f"{base_url}/api/faces/{face.get('id')}/image",
+                    "thumbnail_url": f"{base_url}/api/faces/{face.get('id')}/image?size=150",
+                    "quality": face.get("quality_score", 0),
+                    "confidence": face.get("confidence", 0),
+                    "detection_date": face.get("created_at"),
+                    "description": face.get("description", "Unknown person"),
+                    "event_id": face.get("visitor_event_id"),
+                    "selectable": True,
+                    "face_crop_path": face.get("face_crop_path", ""),
+                    "original_image": face.get("original_image", "")
                 }
-            })
+                processed_unknown.append(face_data)
+            
+            processed_known = []
+            for person in known_persons:
+                person_data = {
+                    "id": person.get("id"),
+                    "name": person.get("name"),
+                    "face_count": person.get("face_count", 0),
+                    "last_seen": person.get("last_seen"),
+                    "avatar_url": f"{base_url}/api/persons/{person.get('id')}/avatar",
+                    "recognition_count": person.get("recognition_count", 0),
+                    "notes": person.get("notes", "")
+                }
+                processed_known.append(person_data)
+            
+            total_unknown = len(processed_unknown)
+            total_known = len(processed_known)
+            total_faces = total_unknown + total_known
+            progress = (total_known / total_faces * 100) if total_faces > 0 else 100
+            
+            return {
+                "unknown_faces": processed_unknown,
+                "known_persons": processed_known,
+                "total_unknown": total_unknown,
+                "total_known": total_known,
+                "total_faces": total_faces,
+                "labeling_progress": progress,
+                "gallery_ready": True,
+                "last_updated": datetime.now().isoformat()
+            }
+            
         except Exception as e:
-            _LOGGER.error("Failed to get face gallery: %s", e)
+            _LOGGER.error("Failed to get face gallery data: %s", e)
             return {
                 "unknown_faces": [],
                 "known_persons": [],
-                "statistics": {
-                    "total_unknown": 0,
-                    "total_known_persons": 0,
-                    "total_labeled_faces": 0,
-                    "labeling_progress": 100
-                }
+                "total_unknown": 0,
+                "total_known": 0,
+                "total_faces": 0,
+                "labeling_progress": 100,
+                "gallery_ready": False,
+                "error": str(e),
+                "last_updated": datetime.now().isoformat()
             }
+
+    async def get_face_gallery(self) -> Dict[str, Any]:
+        """Legacy method - redirects to new implementation."""
+        return await self.get_face_gallery_data()
 
     async def get_face_suggestions(self, face_id: int) -> List[Dict[str, Any]]:
         """Get name suggestions for a face based on similarity."""

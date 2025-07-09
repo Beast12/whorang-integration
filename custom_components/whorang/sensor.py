@@ -272,13 +272,17 @@ class WhoRangFaceGallerySensor(WhoRangSensorEntity):
         """Return face gallery status."""
         try:
             # Get face gallery data from coordinator
-            if hasattr(self.coordinator, 'face_gallery_data') and self.coordinator.face_gallery_data:
-                gallery_data = self.coordinator.face_gallery_data
-                unknown_count = len(gallery_data.get("unknown_faces", []))
-                known_count = len(gallery_data.get("known_persons", []))
-                return f"{unknown_count} unknown, {known_count} known"
+            if self.coordinator.data and "face_gallery_data" in self.coordinator.data:
+                gallery_data = self.coordinator.data["face_gallery_data"]
+                if gallery_data.get("gallery_ready", False):
+                    unknown_count = gallery_data.get("total_unknown", 0)
+                    known_count = gallery_data.get("total_known", 0)
+                    return f"{unknown_count} unknown, {known_count} known"
+                else:
+                    error = gallery_data.get("error", "Unknown error")
+                    return f"Error: {error}"
             else:
-                return "No gallery data"
+                return "Loading gallery data..."
         except Exception as e:
             _LOGGER.error("Failed to get face gallery status: %s", e)
             return "Error loading gallery"
@@ -288,66 +292,82 @@ class WhoRangFaceGallerySensor(WhoRangSensorEntity):
         """Return face gallery data as attributes."""
         try:
             # Get face gallery data from coordinator
-            if hasattr(self.coordinator, 'face_gallery_data') and self.coordinator.face_gallery_data:
-                gallery_data = self.coordinator.face_gallery_data
+            if self.coordinator.data and "face_gallery_data" in self.coordinator.data:
+                gallery_data = self.coordinator.data["face_gallery_data"]
                 
-                # Process unknown faces with full image URLs
-                unknown_faces = gallery_data.get("unknown_faces", [])
-                processed_unknown = []
-                
-                for face in unknown_faces:
-                    processed_face = {
-                        "id": face.get("id"),
-                        "image_url": face.get("image_url"),
-                        "thumbnail_url": face.get("thumbnail_url"),
-                        "quality_score": face.get("quality_score", 0),
-                        "confidence": face.get("confidence", 0),
-                        "detection_date": face.get("detection_date"),
-                        "description": face.get("description", "Unknown person"),
-                        "bounding_box": face.get("bounding_box"),
-                        "original_image_url": face.get("original_image_url")
+                if gallery_data.get("gallery_ready", False):
+                    # Process unknown faces with full image URLs
+                    unknown_faces = gallery_data.get("unknown_faces", [])
+                    processed_unknown = []
+                    
+                    for face in unknown_faces:
+                        processed_face = {
+                            "id": face.get("id"),
+                            "image_url": face.get("image_url"),
+                            "thumbnail_url": face.get("thumbnail_url"),
+                            "quality_score": face.get("quality", 0),
+                            "confidence": face.get("confidence", 0),
+                            "detection_date": face.get("detection_date"),
+                            "description": face.get("description", "Unknown person"),
+                            "selectable": face.get("selectable", True),
+                            "face_crop_path": face.get("face_crop_path", ""),
+                            "original_image": face.get("original_image", "")
+                        }
+                        processed_unknown.append(processed_face)
+                    
+                    # Process known persons
+                    known_persons = gallery_data.get("known_persons", [])
+                    processed_known = []
+                    
+                    for person in known_persons:
+                        processed_person = {
+                            "id": person.get("id"),
+                            "name": person.get("name"),
+                            "face_count": person.get("face_count", 0),
+                            "last_seen": person.get("last_seen"),
+                            "avatar_url": person.get("avatar_url"),
+                            "recognition_count": person.get("recognition_count", 0),
+                            "notes": person.get("notes", "")
+                        }
+                        processed_known.append(processed_person)
+                    
+                    return {
+                        "unknown_faces": processed_unknown,
+                        "known_persons": processed_known,
+                        "total_unknown": gallery_data.get("total_unknown", len(processed_unknown)),
+                        "total_known_persons": gallery_data.get("total_known", len(processed_known)),
+                        "total_faces": gallery_data.get("total_faces", len(processed_unknown) + len(processed_known)),
+                        "labeling_progress": gallery_data.get("labeling_progress", 100),
+                        "gallery_loaded": True,
+                        "gallery_ready": True,
+                        "last_updated": gallery_data.get("last_updated")
                     }
-                    processed_unknown.append(processed_face)
-                
-                # Process known persons
-                known_persons = gallery_data.get("known_persons", [])
-                processed_known = []
-                
-                for person in known_persons:
-                    processed_person = {
-                        "id": person.get("id"),
-                        "name": person.get("name"),
-                        "face_count": person.get("face_count", 0),
-                        "last_seen": person.get("last_seen"),
-                        "first_seen": person.get("first_seen"),
-                        "avg_confidence": person.get("avg_confidence", 0),
-                        "avatar_url": person.get("avatar_url")
+                else:
+                    # Gallery data exists but not ready (error state)
+                    error = gallery_data.get("error", "Unknown error")
+                    return {
+                        "unknown_faces": [],
+                        "known_persons": [],
+                        "total_unknown": 0,
+                        "total_known_persons": 0,
+                        "total_faces": 0,
+                        "labeling_progress": 100,
+                        "gallery_loaded": False,
+                        "gallery_ready": False,
+                        "error": error,
+                        "last_updated": gallery_data.get("last_updated")
                     }
-                    processed_known.append(processed_person)
-                
-                # Get statistics
-                statistics = gallery_data.get("statistics", {})
-                
-                return {
-                    "unknown_faces": processed_unknown,
-                    "known_persons": processed_known,
-                    "total_unknown": statistics.get("total_unknown", len(processed_unknown)),
-                    "total_known_persons": statistics.get("total_known_persons", len(processed_known)),
-                    "total_labeled_faces": statistics.get("total_labeled_faces", 0),
-                    "labeling_progress": statistics.get("labeling_progress", 100),
-                    "gallery_loaded": True,
-                    "last_updated": gallery_data.get("last_updated")
-                }
             else:
                 return {
                     "unknown_faces": [],
                     "known_persons": [],
                     "total_unknown": 0,
                     "total_known_persons": 0,
-                    "total_labeled_faces": 0,
+                    "total_faces": 0,
                     "labeling_progress": 100,
                     "gallery_loaded": False,
-                    "fetch_instruction": "Call service whorang.refresh_face_gallery to load data"
+                    "gallery_ready": False,
+                    "fetch_instruction": "Waiting for coordinator to load face gallery data..."
                 }
                 
         except Exception as e:
@@ -357,9 +377,10 @@ class WhoRangFaceGallerySensor(WhoRangSensorEntity):
                 "known_persons": [],
                 "total_unknown": 0,
                 "total_known_persons": 0,
-                "total_labeled_faces": 0,
+                "total_faces": 0,
                 "labeling_progress": 100,
                 "gallery_loaded": False,
+                "gallery_ready": False,
                 "error": str(e)
             }
 

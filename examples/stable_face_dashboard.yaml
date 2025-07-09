@@ -200,14 +200,8 @@ views:
           
           - type: entities
             entities:
-              - type: input_number
-                name: Face ID to Label
-                entity: input_number.face_id_input
-                icon: mdi:identifier
-              - type: input_text
-                name: Person Name
-                entity: input_text.person_name_input
-                icon: mdi:account
+              - input_number.face_id_input
+              - input_text.person_name_input
           
           - type: grid
             columns: 2
@@ -280,10 +274,7 @@ views:
           
           - type: entities
             entities:
-              - type: input_text
-                name: Batch Person Name
-                entity: input_text.batch_person_name
-                icon: mdi:account-multiple
+              - input_text.batch_person_name
           
           - type: button
             name: Label All Unknown Faces
