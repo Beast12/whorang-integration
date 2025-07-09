@@ -30,6 +30,7 @@ from .const import (
     SENSOR_SYSTEM_STATUS,
     SENSOR_AI_PROVIDER_ACTIVE,
     SENSOR_AI_COST_TODAY,
+    SENSOR_AI_COST_MONTH,
     SENSOR_AI_RESPONSE_TIME,
     SENSOR_KNOWN_FACES_COUNT,
     SENSOR_UNKNOWN_FACES,
@@ -87,6 +88,7 @@ async def async_setup_entry(
         WhoRangSystemStatusSensor(coordinator, config_entry),
         WhoRangAIProviderSensor(coordinator, config_entry),
         WhoRangAICostTodaySensor(coordinator, config_entry),
+        WhoRangAICostMonthSensor(coordinator, config_entry),
         WhoRangAIResponseTimeSensor(coordinator, config_entry),
         WhoRangKnownFacesCountSensor(coordinator, config_entry),
         WhoRangUnknownFacesSensor(coordinator, config_entry),
@@ -463,6 +465,75 @@ class WhoRangAICostTodaySensor(WhoRangSensorEntity):
         
         # Add provider list for easy reference
         attributes["active_providers"] = [p.get("provider") for p in providers if p.get("cost", 0) > 0]
+        
+        return attributes
+
+
+class WhoRangAICostMonthSensor(WhoRangSensorEntity):
+    """Sensor for this month's AI processing costs."""
+
+    def __init__(
+        self,
+        coordinator: WhoRangDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, config_entry, SENSOR_AI_COST_MONTH)
+        self._attr_name = "AI Cost This Month"
+        self._attr_icon = "mdi:currency-usd"
+        self._attr_native_unit_of_measurement = UNIT_CURRENCY_USD
+        self._attr_device_class = SensorDeviceClass.MONETARY
+        self._attr_state_class = STATE_CLASS_TOTAL
+
+    @property
+    def native_value(self) -> float:
+        """Return the state of the sensor."""
+        ai_usage = self.coordinator.async_get_ai_usage()
+        
+        # Get monthly cost from budget information
+        budget = ai_usage.get("budget", {})
+        monthly_spent = budget.get("monthly_spent", 0)
+        
+        # Ensure we return a proper float value, rounded to 4 decimal places for currency precision
+        if isinstance(monthly_spent, (int, float)):
+            return round(float(monthly_spent), 4)
+        return 0.0
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        ai_usage = self.coordinator.async_get_ai_usage()
+        budget = ai_usage.get("budget", {})
+        
+        attributes = {
+            "period": "monthly",
+            "monthly_budget_limit": budget.get("monthly_limit", 0),
+            "monthly_remaining": round(budget.get("remaining", 0), 4),
+        }
+        
+        # Calculate budget usage percentage
+        monthly_limit = budget.get("monthly_limit", 0)
+        monthly_spent = budget.get("monthly_spent", 0)
+        if monthly_limit > 0:
+            attributes["budget_usage_percent"] = round((monthly_spent / monthly_limit) * 100, 1)
+        else:
+            attributes["budget_usage_percent"] = 0
+        
+        # Add provider breakdown for the month if available
+        providers = ai_usage.get("providers", [])
+        monthly_providers = []
+        for provider_data in providers:
+            provider_name = provider_data.get("provider", "unknown")
+            monthly_cost = provider_data.get("monthly_cost", 0)
+            if monthly_cost > 0:
+                monthly_providers.append({
+                    "provider": provider_name,
+                    "cost": round(monthly_cost, 4),
+                    "requests": provider_data.get("monthly_requests", 0)
+                })
+        
+        attributes["monthly_providers"] = monthly_providers
+        attributes["active_providers_count"] = len(monthly_providers)
         
         return attributes
 
