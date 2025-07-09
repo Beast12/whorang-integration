@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.components.http import StaticPathConfig
 
 from .api_client import WhoRangAPIClient, WhoRangConnectionError
 from .const import (
@@ -146,12 +147,10 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
         
         _LOGGER.info("Registering frontend resources from: %s", www_dir)
         
-        # Register static path for custom cards
-        hass.http.register_static_path(
-            "/whorang-face-manager",
-            www_dir,
-            True
-        )
+        # Register static path for custom cards using the new async method
+        await hass.http.async_register_static_paths([
+            StaticPathConfig("/whorang-face-manager", www_dir, True)
+        ])
         
         # Add frontend resources to Lovelace
         frontend_url = "/whorang-face-manager/whorang-face-manager.js"
@@ -161,12 +160,20 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
         
         _LOGGER.info("Successfully registered WhoRang Face Manager custom card at %s", frontend_url)
         
+        # Also register the simple version
+        frontend_url_simple = "/whorang-face-manager/whorang-face-manager-simple.js"
+        hass.components.frontend.add_extra_js_url(frontend_url_simple)
+        _LOGGER.info("Also registered simple version at %s", frontend_url_simple)
+        
         # Also try to register with the resource manager
         try:
             await hass.components.lovelace.async_register_resource(
                 frontend_url, "module"
             )
-            _LOGGER.info("Also registered with Lovelace resource manager")
+            await hass.components.lovelace.async_register_resource(
+                frontend_url_simple, "module"
+            )
+            _LOGGER.info("Also registered both cards with Lovelace resource manager")
         except Exception as resource_err:
             _LOGGER.debug("Could not register with Lovelace resource manager: %s", resource_err)
         
