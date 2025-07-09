@@ -923,44 +923,60 @@ class WhoRangAPIClient:
         try:
             # Get unknown faces with image URLs
             unknown_response = await self._request("GET", "/api/detected-faces/unassigned")
-            unknown_faces = unknown_response.get("faces", [])
+            
+            # Handle different response formats - could be list or dict
+            if isinstance(unknown_response, list):
+                unknown_faces = unknown_response
+            elif isinstance(unknown_response, dict):
+                unknown_faces = unknown_response.get("faces", [])
+            else:
+                unknown_faces = []
             
             # Get known persons
             persons_response = await self._request("GET", "/api/faces/persons")
-            known_persons = persons_response.get("data", [])
+            
+            # Handle different response formats - could be list or dict
+            if isinstance(persons_response, list):
+                known_persons = persons_response
+            elif isinstance(persons_response, dict):
+                known_persons = persons_response.get("data", [])
+            else:
+                known_persons = []
             
             # Build face gallery data with proper URLs
             base_url = self.base_url
             
             processed_unknown = []
             for face in unknown_faces:
-                face_data = {
-                    "id": face.get("id"),
-                    "image_url": f"{base_url}/api/faces/{face.get('id')}/image",
-                    "thumbnail_url": f"{base_url}/api/faces/{face.get('id')}/image?size=150",
-                    "quality": face.get("quality_score", 0),
-                    "confidence": face.get("confidence", 0),
-                    "detection_date": face.get("created_at"),
-                    "description": face.get("description", "Unknown person"),
-                    "event_id": face.get("visitor_event_id"),
-                    "selectable": True,
-                    "face_crop_path": face.get("face_crop_path", ""),
-                    "original_image": face.get("original_image", "")
-                }
-                processed_unknown.append(face_data)
+                if isinstance(face, dict):
+                    face_data = {
+                        "id": face.get("id"),
+                        "image_url": f"{base_url}/api/faces/{face.get('id')}/image",
+                        "thumbnail_url": f"{base_url}/api/faces/{face.get('id')}/image?size=150",
+                        "quality": face.get("quality_score", 0),
+                        "confidence": face.get("confidence", 0),
+                        "detection_date": face.get("created_at"),
+                        "description": face.get("description", "Unknown person"),
+                        "event_id": face.get("visitor_event_id"),
+                        "selectable": True,
+                        "face_crop_path": face.get("face_crop_path", ""),
+                        "original_image": face.get("original_image", "")
+                    }
+                    processed_unknown.append(face_data)
             
             processed_known = []
             for person in known_persons:
-                person_data = {
-                    "id": person.get("id"),
-                    "name": person.get("name"),
-                    "face_count": person.get("face_count", 0),
-                    "last_seen": person.get("last_seen"),
-                    "avatar_url": f"{base_url}/api/persons/{person.get('id')}/avatar",
-                    "recognition_count": person.get("recognition_count", 0),
-                    "notes": person.get("notes", "")
-                }
-                processed_known.append(person_data)
+                if isinstance(person, dict):
+                    person_data = {
+                        "id": person.get("id"),
+                        "name": person.get("name"),
+                        "face_count": person.get("face_count", 0),
+                        "last_seen": person.get("last_seen"),
+                        "avatar_url": f"{base_url}/api/persons/{person.get('id')}/avatar",
+                        "recognition_count": person.get("recognition_count", 0),
+                        "notes": person.get("notes", "")
+                    }
+                    processed_known.append(person_data)
             
             total_unknown = len(processed_unknown)
             total_known = len(processed_known)
