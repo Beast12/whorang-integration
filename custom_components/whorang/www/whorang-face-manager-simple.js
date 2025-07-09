@@ -133,7 +133,110 @@ class WhoRangFaceManagerCard extends HTMLElement {
         this.selectedFaces = new Set();
     }
 
-    updateContent() {
+    getWhoRangBaseUrlCandidates() {
+        const candidates = [];
+        
+        // 1. User-configured URL (highest priority)
+        if (this.config.whorang_url) {
+            candidates.push(this.config.whorang_url.replace(/\/$/, ''));
+        }
+        
+        // 2. Integration-provided URL from entity attributes
+        if (this._hass && this.config.entity) {
+            const entity = this._hass.states[this.config.entity];
+            if (entity?.attributes?.backend_url) {
+                candidates.push(entity.attributes.backend_url.replace(/\/$/, ''));
+            }
+            if (entity?.attributes?.whorang_server_url) {
+                candidates.push(entity.attributes.whorang_server_url.replace(/\/$/, ''));
+            }
+        }
+        
+        // 3. Smart detection based on current window location
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        
+        // Same host with different protocols and ports
+        candidates.push(`${protocol}//${hostname}:3001`);
+        if (protocol === 'https:') {
+            candidates.push(`http://${hostname}:3001`);
+        }
+        
+        // 4. Common Home Assistant configurations
+        if (hostname !== 'homeassistant.local') {
+            candidates.push('http://homeassistant.local:3001');
+        }
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+            candidates.push('http://localhost:3001');
+            candidates.push('http://127.0.0.1:3001');
+        }
+        
+        // 5. Additional fallback URLs from config
+        if (this.config.fallback_urls && Array.isArray(this.config.fallback_urls)) {
+            candidates.push(...this.config.fallback_urls.map(url => url.replace(/\/$/, '')));
+        }
+        
+        // Remove duplicates while preserving order
+        return [...new Set(candidates)];
+    }
+
+    async testImageUrl(url) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const timeout = setTimeout(() => {
+                resolve(false);
+            }, 2000); // 2 second timeout
+            
+            img.onload = () => {
+                clearTimeout(timeout);
+                resolve(true);
+            };
+            
+            img.onerror = () => {
+                clearTimeout(timeout);
+                resolve(false);
+            };
+            
+            img.src = url;
+        });
+    }
+
+    async getWorkingImageUrl(face) {
+        // First try direct URLs from face data
+        if (face.image_url) {
+            if (await this.testImageUrl(face.image_url)) {
+                return face.image_url;
+            }
+        }
+        
+        if (face.crop_path) {
+            if (await this.testImageUrl(face.crop_path)) {
+                return face.crop_path;
+            }
+        }
+        
+        if (face.thumbnail_url) {
+            if (await this.testImageUrl(face.thumbnail_url)) {
+                return face.thumbnail_url;
+            }
+        }
+        
+        // Try constructed URLs with different base URLs
+        const baseUrls = this.getWhoRangBaseUrlCandidates();
+        
+        for (const baseUrl of baseUrls) {
+            const imageUrl = `${baseUrl}/api/faces/${face.id}/image?size=thumbnail`;
+            if (await this.testImageUrl(imageUrl)) {
+                // Cache the working base URL for future use
+                this._workingBaseUrl = baseUrl;
+                return imageUrl;
+            }
+        }
+        
+        return null;
+    }
+
+    async updateContent() {
         if (!this._hass || !this.config.entity) return;
 
         const entity = this._hass.states[this.config.entity];
@@ -160,27 +263,57 @@ class WhoRangFaceManagerCard extends HTMLElement {
             return;
         }
 
-        unknownFaces.forEach(face => {
+        // Process faces with robust image loading
+        for (const face of unknownFaces) {
             const faceItem = document.createElement('div');
             faceItem.className = 'face-item';
             faceItem.dataset.faceId = face.id;
 
-            const imageUrl = face.image_url || face.crop_path || `http://127.0.0.1:3001/api/faces/${face.id}/image?size=thumbnail`;
-            
+            // Create initial structure with loading state
             faceItem.innerHTML = `
                 <div class="face-image">
-                    <img src="${imageUrl}" alt="Face ${face.id}" 
-                         style="width: 100%; height: 100%; object-fit: cover;"
-                         onerror="this.style.display='none'; this.parentNode.textContent='Face ${face.id}';" />
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: #666;">
+                        Loading...
+                    </div>
                 </div>
                 <div class="face-info">
                     ID: ${face.id} | Quality: ${Math.round((face.quality || 0) * 100)}%
                 </div>
             `;
 
+            // Try to get a working image URL
+            try {
+                const workingUrl = await this.getWorkingImageUrl(face);
+                
+                if (workingUrl) {
+                    const imageContainer = faceItem.querySelector('.face-image');
+                    imageContainer.innerHTML = `
+                        <img src="${workingUrl}" alt="Face ${face.id}" 
+                             style="width: 100%; height: 100%; object-fit: cover;"
+                             onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: #f44336;\\'>Image Error</div>';" />
+                    `;
+                } else {
+                    // No working URL found
+                    const imageContainer = faceItem.querySelector('.face-image');
+                    imageContainer.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: #f44336;">
+                            Face ${face.id}<br>No Image
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error(`Failed to load image for face ${face.id}:`, error);
+                const imageContainer = faceItem.querySelector('.face-image');
+                imageContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 12px; color: #f44336;">
+                        Face ${face.id}<br>Load Error
+                    </div>
+                `;
+            }
+
             faceItem.addEventListener('click', () => this.toggleFaceSelection(face.id, faceItem));
             faceGrid.appendChild(faceItem);
-        });
+        }
     }
 
     toggleFaceSelection(faceId, element) {
