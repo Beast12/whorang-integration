@@ -622,23 +622,21 @@ class WhoRangAPIClient:
             return []
 
     def _parse_ollama_models(self, models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Parse Ollama models from direct API response."""
+        """Parse Ollama models from direct API response - show ALL models, let user choose."""
         transformed_models = []
         for model in models:
             if isinstance(model, dict):
-                # Filter for vision-capable models
                 model_name = model.get("name", "")
-                if any(vision_keyword in model_name.lower() for vision_keyword in 
-                       ["llava", "vision", "cogvlm", "bakllava", "llama-vision"]):
+                if model_name:  # Only require that the model has a name
                     transformed_models.append({
                         "name": model_name,
                         "display_name": model_name,
                         "size": model.get("size", 0),
                         "modified_at": model.get("modified_at"),
-                        "is_vision": True
+                        "is_vision": True  # Let user decide which models work for vision
                     })
         
-        _LOGGER.debug("Parsed %d vision-capable Ollama models", len(transformed_models))
+        _LOGGER.debug("Parsed %d Ollama models (all models, no filtering)", len(transformed_models))
         return transformed_models
 
     async def get_ollama_status(self) -> Dict[str, Any]:

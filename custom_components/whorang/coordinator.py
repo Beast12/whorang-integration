@@ -116,13 +116,57 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
             ollama_models = []
             ollama_status = {}
             if current_ai_provider == "local":
-                ollama_models = await self.api_client.get_ollama_models()
-                ollama_status = await self.api_client.get_ollama_status()
+                try:
+                    # Use the new backend endpoint for dynamic model discovery
+                    local_models_response = await self.api_client.get_provider_models("local")
+                    if local_models_response:
+                        # Transform backend response to match expected format
+                        ollama_models = []
+                        for model in local_models_response:
+                            if isinstance(model, dict):
+                                ollama_models.append({
+                                    "name": model.get("value", ""),
+                                    "display_name": model.get("label", ""),
+                                    "size": model.get("size", 0),
+                                    "is_vision": model.get("is_vision", True),
+                                    "recommended": model.get("recommended", False)
+                                })
+                            elif isinstance(model, str):
+                                ollama_models.append({
+                                    "name": model,
+                                    "display_name": model,
+                                    "size": 0,
+                                    "is_vision": True,
+                                    "recommended": False
+                                })
+                        
+                        # Update available_models with dynamic Ollama models
+                        available_models["local"] = [model["name"] for model in ollama_models]
+                        _LOGGER.debug("Updated local models with %d Ollama models from backend", len(ollama_models))
+                    else:
+                        # Fallback to direct Ollama API if backend fails
+                        _LOGGER.debug("Backend model discovery failed, trying direct Ollama API")
+                        ollama_models = await self.api_client.get_ollama_models()
+                        if ollama_models:
+                            available_models["local"] = [model["name"] for model in ollama_models]
+                            _LOGGER.debug("Updated local models with %d Ollama models from direct API", len(ollama_models))
+                except Exception as e:
+                    _LOGGER.error("Failed to get Ollama models: %s", e)
+                    # Fallback to direct Ollama API
+                    try:
+                        ollama_models = await self.api_client.get_ollama_models()
+                        if ollama_models:
+                            available_models["local"] = [model["name"] for model in ollama_models]
+                            _LOGGER.debug("Updated local models with %d Ollama models from fallback", len(ollama_models))
+                    except Exception as fallback_error:
+                        _LOGGER.error("Fallback Ollama model discovery also failed: %s", fallback_error)
                 
-                # Update available_models with dynamic Ollama models if available
-                if ollama_models:
-                    available_models["local"] = [model["name"] for model in ollama_models]
-                    _LOGGER.debug("Updated local models with %d Ollama models", len(ollama_models))
+                # Get Ollama status
+                try:
+                    ollama_status = await self.api_client.get_ollama_status()
+                except Exception as e:
+                    _LOGGER.error("Failed to get Ollama status: %s", e)
+                    ollama_status = {"status": "unknown", "error": str(e)}
             
             # Detect if there's a new visitor
             if latest_visitor and latest_visitor.get("visitor_id") != self._last_visitor_id:
