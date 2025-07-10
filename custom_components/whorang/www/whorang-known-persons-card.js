@@ -474,10 +474,26 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       }
     }
     
-    // The backend doesn't have /api/persons/{id}/image endpoint
-    // Instead, we need to use the first face image for this person
-    // Since we don't have face IDs in person data, we'll use a placeholder for now
-    // The real solution would be to get face IDs from the backend
+    // Try multiple avatar URL patterns
+    const baseUrls = this.getWhoRangBaseUrlCandidates();
+    
+    for (const baseUrl of baseUrls) {
+      // Try different avatar endpoint patterns
+      const avatarPatterns = [
+        `${baseUrl}/api/faces/persons/${person.id}/avatar`,  // Our new pattern
+        `${baseUrl}/api/persons/${person.id}/avatar`,        // Current backend pattern
+        `${baseUrl}/api/persons/${person.id}/image`,         // Alternative pattern
+        `${baseUrl}/api/persons/${person.id}/thumbnail`      // Another alternative
+      ];
+      
+      for (const avatarUrl of avatarPatterns) {
+        if (await this.testImageUrl(avatarUrl)) {
+          // Cache the working base URL for future use
+          this._workingBaseUrl = baseUrl;
+          return avatarUrl;
+        }
+      }
+    }
     
     return null; // No avatar available - will show placeholder
   }
