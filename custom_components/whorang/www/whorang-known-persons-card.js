@@ -482,21 +482,47 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       }
     }
     
-    // Try constructed URLs with different base URLs
+    // Try constructed avatar URLs with different base URLs
     const baseUrls = this.getWhoRangBaseUrlCandidates();
-    console.log(`[WhoRang] Trying ${baseUrls.length} base URL candidates:`, baseUrls);
+    console.log(`[WhoRang] Trying ${baseUrls.length} base URL candidates for avatar:`, baseUrls);
     
     for (const baseUrl of baseUrls) {
-      const avatarUrl = `${baseUrl}/api/persons/${person.id}/avatar`;
-      console.log(`[WhoRang] Testing avatar URL: ${avatarUrl}`);
+      // Try different avatar endpoint patterns
+      const avatarPatterns = [
+        `${baseUrl}/api/persons/${person.id}/avatar`,
+        `${baseUrl}/api/persons/${person.id}/image`,
+        `${baseUrl}/api/persons/${person.id}/thumbnail`,
+        `${baseUrl}/api/persons/${person.id}/face`,
+        `${baseUrl}/api/persons/${person.id}/photo`
+      ];
       
-      if (await this.testImageUrl(avatarUrl)) {
-        console.log(`[WhoRang] ✅ Found working avatar URL: ${avatarUrl}`);
-        // Cache the working base URL for future use
-        this._workingBaseUrl = baseUrl;
-        return avatarUrl;
-      } else {
-        console.log(`[WhoRang] ❌ Failed: ${avatarUrl}`);
+      for (const avatarUrl of avatarPatterns) {
+        console.log(`[WhoRang] Testing avatar URL: ${avatarUrl}`);
+        
+        if (await this.testImageUrl(avatarUrl)) {
+          console.log(`[WhoRang] ✅ Found working avatar URL: ${avatarUrl}`);
+          // Cache the working base URL for future use
+          this._workingBaseUrl = baseUrl;
+          return avatarUrl;
+        } else {
+          console.log(`[WhoRang] ❌ Failed: ${avatarUrl}`);
+        }
+      }
+    }
+    
+    // If no avatar endpoint works, try to get the first face image for this person
+    console.log(`[WhoRang] No avatar endpoint works, trying to use first face image for person ${person.name}`);
+    
+    // Check if we have face data for this person
+    if (person.first_face_id) {
+      for (const baseUrl of baseUrls) {
+        const faceImageUrl = `${baseUrl}/api/faces/${person.first_face_id}/image?size=thumbnail`;
+        console.log(`[WhoRang] Testing first face image URL: ${faceImageUrl}`);
+        
+        if (await this.testImageUrl(faceImageUrl)) {
+          console.log(`[WhoRang] ✅ Using first face image as avatar: ${faceImageUrl}`);
+          return faceImageUrl;
+        }
       }
     }
     
