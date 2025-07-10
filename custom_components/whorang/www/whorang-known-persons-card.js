@@ -404,49 +404,59 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     // 1. User-configured URL (highest priority)
     if (this.config.whorang_url) {
       candidates.push(this.config.whorang_url.replace(/\/$/, ''));
+      console.log(`[WhoRang] Using user-configured URL: ${this.config.whorang_url}`);
     }
     
-    // 2. Backend URL from entity attributes
-    if (this.backendUrl) {
-      candidates.push(this.backendUrl.replace(/\/$/, ''));
-    }
-    
-    // 3. Integration-provided URL from entity attributes
+    // 2. Backend URL from entity attributes (second priority)
     if (this._hass && this.config.entity) {
       const entity = this._hass.states[this.config.entity];
       if (entity?.attributes?.backend_url) {
-        candidates.push(entity.attributes.backend_url.replace(/\/$/, ''));
+        const backendUrl = entity.attributes.backend_url.replace(/\/$/, '');
+        candidates.push(backendUrl);
+        console.log(`[WhoRang] Using entity backend_url: ${backendUrl}`);
       }
     }
     
-    // 4. Smart detection based on current window location
+    // 3. Backend URL from updatePersons method
+    if (this.backendUrl) {
+      candidates.push(this.backendUrl.replace(/\/$/, ''));
+      console.log(`[WhoRang] Using stored backend URL: ${this.backendUrl}`);
+    }
+    
+    // 4. Force localhost:3001 as high priority (your actual backend)
+    candidates.push('http://localhost:3001');
+    console.log(`[WhoRang] Adding localhost:3001 as high priority`);
+    
+    // 5. Smart detection based on current window location
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // Common WhoRang backend ports and configurations
-    candidates.push(`${protocol}//${hostname}:3001`);  // Your actual backend port
-    candidates.push(`${protocol}//${hostname}:8080`);
+    // Same host with port 3001 (your backend port)
+    candidates.push(`${protocol}//${hostname}:3001`);
     candidates.push(`http://${hostname}:3001`);        // Force HTTP for backend
+    
+    // Fallback to port 8080
+    candidates.push(`${protocol}//${hostname}:8080`);
     candidates.push(`http://${hostname}:8080`);
     
-    // 5. Common configurations
+    // 6. Common configurations
     if (hostname !== 'homeassistant.local') {
       candidates.push('http://homeassistant.local:3001');
       candidates.push('http://homeassistant.local:8080');
     }
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      candidates.push('http://localhost:3001');
-      candidates.push('http://localhost:8080');
       candidates.push('http://127.0.0.1:3001');
       candidates.push('http://127.0.0.1:8080');
     }
     
-    // 6. Your specific backend IP
-    candidates.push('http://192.168.86.163:8080');
+    // 7. Your specific backend IP (lower priority)
     candidates.push('http://192.168.86.163:3001');
+    candidates.push('http://192.168.86.163:8080');
     
     // Remove duplicates while preserving order
-    return [...new Set(candidates)];
+    const uniqueCandidates = [...new Set(candidates)];
+    console.log(`[WhoRang] Final URL candidates:`, uniqueCandidates);
+    return uniqueCandidates;
   }
 
   async testImageUrl(url) {
