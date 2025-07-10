@@ -423,20 +423,27 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // Same host with different ports
+    // Common WhoRang backend ports and configurations
+    candidates.push(`${protocol}//${hostname}:3001`);  // Your actual backend port
     candidates.push(`${protocol}//${hostname}:8080`);
-    if (protocol === 'https:') {
-      candidates.push(`http://${hostname}:8080`);
-    }
+    candidates.push(`http://${hostname}:3001`);        // Force HTTP for backend
+    candidates.push(`http://${hostname}:8080`);
     
     // 5. Common configurations
     if (hostname !== 'homeassistant.local') {
+      candidates.push('http://homeassistant.local:3001');
       candidates.push('http://homeassistant.local:8080');
     }
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      candidates.push('http://localhost:3001');
       candidates.push('http://localhost:8080');
+      candidates.push('http://127.0.0.1:3001');
       candidates.push('http://127.0.0.1:8080');
     }
+    
+    // 6. Your specific backend IP
+    candidates.push('http://192.168.86.163:8080');
+    candidates.push('http://192.168.86.163:3001');
     
     // Remove duplicates while preserving order
     return [...new Set(candidates)];
@@ -464,25 +471,36 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   }
 
   async getWorkingAvatarUrl(person) {
+    console.log(`[WhoRang] Trying to load avatar for person: ${person.name} (ID: ${person.id})`);
+    
     // First try direct avatar URL from person data
     if (person.avatar_url) {
+      console.log(`[WhoRang] Trying direct avatar URL: ${person.avatar_url}`);
       if (await this.testImageUrl(person.avatar_url)) {
+        console.log(`[WhoRang] ✅ Direct avatar URL works: ${person.avatar_url}`);
         return person.avatar_url;
       }
     }
     
     // Try constructed URLs with different base URLs
     const baseUrls = this.getWhoRangBaseUrlCandidates();
+    console.log(`[WhoRang] Trying ${baseUrls.length} base URL candidates:`, baseUrls);
     
     for (const baseUrl of baseUrls) {
       const avatarUrl = `${baseUrl}/api/persons/${person.id}/avatar`;
+      console.log(`[WhoRang] Testing avatar URL: ${avatarUrl}`);
+      
       if (await this.testImageUrl(avatarUrl)) {
+        console.log(`[WhoRang] ✅ Found working avatar URL: ${avatarUrl}`);
         // Cache the working base URL for future use
         this._workingBaseUrl = baseUrl;
         return avatarUrl;
+      } else {
+        console.log(`[WhoRang] ❌ Failed: ${avatarUrl}`);
       }
     }
     
+    console.log(`[WhoRang] ❌ No working avatar URL found for person ${person.name}`);
     return null;
   }
 

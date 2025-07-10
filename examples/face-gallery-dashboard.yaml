@@ -13,7 +13,7 @@ cards:
     cards:
       # Widget 1: Unknown Faces Gallery (Enhanced existing card)
       - type: custom:whorang-face-manager-card
-        entity: sensor.whorang_face_gallery
+        entity: sensor.whorang_ai_doorbell_face_gallery
         title: "Unknown Faces - Need Labeling"
         columns: 3
         show_progress: true
@@ -22,7 +22,7 @@ cards:
         
       # Widget 2: Known Persons Gallery (New card)
       - type: custom:whorang-known-persons-card
-        entity: sensor.whorang_known_persons_gallery
+        entity: sensor.whorang_ai_doorbell_known_persons_gallery
         title: "Known Persons"
         columns: 2
         show_stats: true
