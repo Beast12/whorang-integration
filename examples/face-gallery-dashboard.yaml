@@ -1,0 +1,188 @@
+# WhoRang Face Gallery Dashboard Configuration
+# This example shows how to set up two dashboard widgets:
+# 1. Unknown Faces Gallery - for labeling unknown faces
+# 2. Known Persons Gallery - for viewing known persons with avatars
+
+# Dashboard View Configuration
+title: Face Recognition Gallery
+path: face-gallery
+icon: mdi:face-recognition
+cards:
+  # Two-Widget Layout: Side by Side
+  - type: horizontal-stack
+    cards:
+      # Widget 1: Unknown Faces Gallery (Enhanced existing card)
+      - type: custom:whorang-face-manager-card
+        entity: sensor.whorang_face_gallery
+        title: "Unknown Faces - Need Labeling"
+        columns: 3
+        show_progress: true
+        show_controls: true
+        whorang_url: "http://192.168.86.163:8080"  # Your WhoRang backend URL
+        
+      # Widget 2: Known Persons Gallery (New card)
+      - type: custom:whorang-known-persons-card
+        entity: sensor.whorang_known_persons_gallery
+        title: "Known Persons"
+        columns: 2
+        show_stats: true
+        show_last_seen: true
+        show_face_count: true
+        whorang_url: "http://192.168.86.163:8080"  # Your WhoRang backend URL
+
+  # Alternative: Stacked Layout (Full Width)
+  # Uncomment this section and comment out the horizontal-stack above for full-width cards
+  
+  # # Widget 1: Unknown Faces Gallery
+  # - type: custom:whorang-face-manager-card
+  #   entity: sensor.whorang_face_gallery
+  #   title: "Unknown Faces - Need Labeling"
+  #   columns: 4
+  #   show_progress: true
+  #   show_controls: true
+  #   whorang_url: "http://192.168.86.163:8080"
+  
+  # # Widget 2: Known Persons Gallery
+  # - type: custom:whorang-known-persons-card
+  #   entity: sensor.whorang_known_persons_gallery
+  #   title: "Known Persons"
+  #   columns: 4
+  #   show_stats: true
+  #   show_last_seen: true
+  #   show_face_count: true
+  #   whorang_url: "http://192.168.86.163:8080"
+
+  # Additional Statistics Cards
+  - type: horizontal-stack
+    cards:
+      - type: entity
+        entity: sensor.whorang_face_gallery
+        name: "Face Gallery Status"
+        icon: mdi:view-gallery
+        
+      - type: entity
+        entity: sensor.whorang_known_persons_gallery
+        name: "Known Persons Count"
+        icon: mdi:account-group
+        
+      - type: entity
+        entity: sensor.whorang_latest_face_detection
+        name: "Latest Detection"
+        icon: mdi:face-man
+
+  # Face Recognition Progress Card
+  - type: custom:bar-card
+    entity: sensor.whorang_face_gallery
+    attribute: labeling_progress
+    name: "Face Labeling Progress"
+    icon: mdi:progress-check
+    positions:
+      icon: inside
+      indicator: inside
+      name: inside
+    height: 40px
+    color: 
+      - color: "#4CAF50"
+        from: 80
+        to: 100
+      - color: "#FF9800"
+        from: 50
+        to: 80
+      - color: "#F44336"
+        from: 0
+        to: 50
+
+# Required Resources Configuration
+# Add these to your Lovelace resources (Configuration -> Dashboards -> Resources)
+
+# Resource 1: Unknown Faces Manager (existing)
+# URL: /whorang-face-manager/whorang-face-manager.js
+# Type: JavaScript Module
+
+# Resource 2: Known Persons Gallery (new)
+# URL: /whorang-face-manager/whorang-known-persons-card.js  
+# Type: JavaScript Module
+
+# Resource 3: Bar Card (optional, for progress visualization)
+# URL: /hacsfiles/bar-card/bar-card.js
+# Type: JavaScript Module
+# Note: Install via HACS if you want the progress bar
+
+# Entity Configuration
+# The following entities should be automatically created by the WhoRang integration:
+# - sensor.whorang_face_gallery (provides unknown faces data)
+# - sensor.whorang_known_persons_gallery (provides known persons data)
+# - sensor.whorang_latest_face_detection (provides latest detection info)
+
+# Configuration Options for Custom Cards
+
+# whorang-face-manager-card options:
+# - entity: Entity ID for face gallery data
+# - title: Card title
+# - columns: Number of columns in face grid (default: 4)
+# - show_progress: Show labeling progress bar (default: true)
+# - show_controls: Show labeling controls (default: true)
+# - whorang_url: Backend URL for image loading (auto-detected if not provided)
+
+# whorang-known-persons-card options:
+# - entity: Entity ID for known persons data
+# - title: Card title
+# - columns: Number of columns in persons grid (default: 3)
+# - show_stats: Show statistics summary (default: true)
+# - show_last_seen: Show last seen dates (default: true)
+# - show_face_count: Show face count badges (default: true)
+# - whorang_url: Backend URL for avatar loading (auto-detected if not provided)
+
+# Advanced Configuration Examples
+
+# Compact Layout (Mobile-Friendly)
+# - type: custom:whorang-face-manager-card
+#   entity: sensor.whorang_face_gallery
+#   title: "Unknown"
+#   columns: 2
+#   show_progress: false
+#   show_controls: true
+
+# - type: custom:whorang-known-persons-card
+#   entity: sensor.whorang_known_persons_gallery
+#   title: "Known"
+#   columns: 2
+#   show_stats: false
+#   show_last_seen: false
+#   show_face_count: true
+
+# Large Display Layout
+# - type: custom:whorang-face-manager-card
+#   entity: sensor.whorang_face_gallery
+#   title: "Unknown Faces - Need Labeling"
+#   columns: 6
+#   show_progress: true
+#   show_controls: true
+
+# - type: custom:whorang-known-persons-card
+#   entity: sensor.whorang_known_persons_gallery
+#   title: "Known Persons Gallery"
+#   columns: 5
+#   show_stats: true
+#   show_last_seen: true
+#   show_face_count: true
+
+# Troubleshooting
+
+# If cards don't load:
+# 1. Check that resources are properly added to Lovelace
+# 2. Verify entity IDs exist in Developer Tools -> States
+# 3. Check browser console for JavaScript errors
+# 4. Ensure WhoRang backend is running and accessible
+
+# If images don't load:
+# 1. Verify whorang_url is correct
+# 2. Check network connectivity between Home Assistant and WhoRang backend
+# 3. Verify WhoRang backend API endpoints are accessible
+# 4. Check browser network tab for failed image requests
+
+# If data doesn't update:
+# 1. Check that WhoRang integration is properly configured
+# 2. Verify WebSocket connection is working
+# 3. Check coordinator update intervals
+# 4. Manually refresh entities in Developer Tools

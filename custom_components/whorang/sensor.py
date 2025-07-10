@@ -94,6 +94,7 @@ async def async_setup_entry(
         WhoRangUnknownFacesSensor(coordinator, config_entry),
         WhoRangLatestFaceDetectionSensor(coordinator, config_entry),
         WhoRangFaceGallerySensor(coordinator, config_entry),
+        WhoRangKnownPersonsGallerySensor(coordinator, config_entry),
     ]
 
     async_add_entities(entities)
@@ -898,6 +899,146 @@ class WhoRangUnknownFacesSensor(WhoRangSensorEntity):
                 _LOGGER.debug("No unknown faces data available: %s", e)
         
         return attributes
+
+
+class WhoRangKnownPersonsGallerySensor(WhoRangSensorEntity):
+    """Sensor providing known persons gallery data with avatars."""
+
+    def __init__(
+        self,
+        coordinator: WhoRangDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator, config_entry, "known_persons_gallery")
+        self._attr_name = "Known Persons Gallery"
+        self._attr_icon = "mdi:account-group"
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of known persons."""
+        try:
+            # Get face gallery data from coordinator
+            if self.coordinator.data and "face_gallery_data" in self.coordinator.data:
+                gallery_data = self.coordinator.data["face_gallery_data"]
+                if gallery_data.get("gallery_ready", False):
+                    return gallery_data.get("total_known", 0)
+                else:
+                    return 0
+            else:
+                # Fallback to known persons from coordinator
+                known_persons = self.coordinator.async_get_known_persons()
+                return len(known_persons)
+        except Exception as e:
+            _LOGGER.error("Failed to get known persons count: %s", e)
+            return 0
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return known persons gallery data as attributes."""
+        try:
+            # Get face gallery data from coordinator
+            if self.coordinator.data and "face_gallery_data" in self.coordinator.data:
+                gallery_data = self.coordinator.data["face_gallery_data"]
+                
+                if gallery_data.get("gallery_ready", False):
+                    # Process known persons with full avatar URLs
+                    known_persons = gallery_data.get("known_persons", [])
+                    processed_persons = []
+                    
+                    for person in known_persons:
+                        processed_person = {
+                            "id": person.get("id"),
+                            "name": person.get("name"),
+                            "face_count": person.get("face_count", 0),
+                            "last_seen": person.get("last_seen"),
+                            "first_seen": person.get("first_seen"),
+                            "avatar_url": person.get("avatar_url"),
+                            "avg_confidence": person.get("avg_confidence", 0),
+                            "recognition_count": person.get("recognition_count", 0),
+                            "notes": person.get("notes", ""),
+                            "created_at": person.get("created_at"),
+                            "updated_at": person.get("updated_at")
+                        }
+                        processed_persons.append(processed_person)
+                    
+                    # Calculate statistics
+                    total_faces = sum(p.get("face_count", 0) for p in processed_persons)
+                    avg_faces_per_person = round(total_faces / len(processed_persons), 1) if processed_persons else 0
+                    
+                    # Find most and least active persons
+                    most_active = max(processed_persons, key=lambda p: p.get("face_count", 0)) if processed_persons else None
+                    least_active = min(processed_persons, key=lambda p: p.get("face_count", 0)) if processed_persons else None
+                    
+                    # Find most recent activity
+                    recent_persons = [p for p in processed_persons if p.get("last_seen")]
+                    most_recent = max(recent_persons, key=lambda p: p.get("last_seen", "")) if recent_persons else None
+                    
+                    return {
+                        "persons": processed_persons,
+                        "total_known_persons": len(processed_persons),
+                        "total_labeled_faces": total_faces,
+                        "avg_faces_per_person": avg_faces_per_person,
+                        "most_active_person": most_active,
+                        "least_active_person": least_active,
+                        "most_recent_activity": most_recent,
+                        "gallery_ready": True,
+                        "backend_url": self.coordinator.api_client.base_url,
+                        "last_updated": gallery_data.get("last_updated")
+                    }
+                else:
+                    # Gallery data exists but not ready (error state)
+                    error = gallery_data.get("error", "Unknown error")
+                    return {
+                        "persons": [],
+                        "total_known_persons": 0,
+                        "total_labeled_faces": 0,
+                        "avg_faces_per_person": 0,
+                        "gallery_ready": False,
+                        "error": error,
+                        "backend_url": self.coordinator.api_client.base_url,
+                        "last_updated": gallery_data.get("last_updated")
+                    }
+            else:
+                # Fallback to basic known persons data
+                known_persons = self.coordinator.async_get_known_persons()
+                processed_persons = []
+                
+                for person in known_persons:
+                    processed_person = {
+                        "id": person.get("id"),
+                        "name": person.get("name"),
+                        "face_count": person.get("face_count", 0),
+                        "last_seen": person.get("last_seen"),
+                        "avatar_url": None,  # Will need to be constructed
+                        "avg_confidence": 0,
+                        "recognition_count": 0,
+                        "notes": person.get("notes", "")
+                    }
+                    processed_persons.append(processed_person)
+                
+                return {
+                    "persons": processed_persons,
+                    "total_known_persons": len(processed_persons),
+                    "total_labeled_faces": sum(p.get("face_count", 0) for p in processed_persons),
+                    "avg_faces_per_person": 0,
+                    "gallery_ready": False,
+                    "backend_url": self.coordinator.api_client.base_url,
+                    "fetch_instruction": "Waiting for coordinator to load face gallery data..."
+                }
+                
+        except Exception as e:
+            _LOGGER.error("Failed to get known persons gallery attributes: %s", e)
+            return {
+                "persons": [],
+                "total_known_persons": 0,
+                "total_labeled_faces": 0,
+                "avg_faces_per_person": 0,
+                "gallery_ready": False,
+                "backend_url": self.coordinator.api_client.base_url,
+                "error": str(e)
+            }
 
 
 class WhoRangLatestFaceDetectionSensor(WhoRangSensorEntity):

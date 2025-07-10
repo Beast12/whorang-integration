@@ -144,6 +144,7 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
     _LOGGER.info("Custom cards available at:")
     _LOGGER.info("- /local/community/whorang/whorang-face-manager.js")
     _LOGGER.info("- /local/community/whorang/whorang-face-manager-simple.js")
+    _LOGGER.info("- /local/community/whorang/whorang-known-persons-card.js")
     _LOGGER.info("Manual registration: Settings → Dashboards → Resources")
 
 
