@@ -404,59 +404,45 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     // 1. User-configured URL (highest priority)
     if (this.config.whorang_url) {
       candidates.push(this.config.whorang_url.replace(/\/$/, ''));
-      console.log(`[WhoRang] Using user-configured URL: ${this.config.whorang_url}`);
     }
     
-    // 2. Backend URL from entity attributes (second priority)
+    // 2. Integration-provided URL from entity attributes
     if (this._hass && this.config.entity) {
       const entity = this._hass.states[this.config.entity];
       if (entity?.attributes?.backend_url) {
-        const backendUrl = entity.attributes.backend_url.replace(/\/$/, '');
-        candidates.push(backendUrl);
-        console.log(`[WhoRang] Using entity backend_url: ${backendUrl}`);
+        candidates.push(entity.attributes.backend_url.replace(/\/$/, ''));
+      }
+      if (entity?.attributes?.whorang_server_url) {
+        candidates.push(entity.attributes.whorang_server_url.replace(/\/$/, ''));
       }
     }
     
-    // 3. Backend URL from updatePersons method
-    if (this.backendUrl) {
-      candidates.push(this.backendUrl.replace(/\/$/, ''));
-      console.log(`[WhoRang] Using stored backend URL: ${this.backendUrl}`);
-    }
-    
-    // 4. Force localhost:3001 as high priority (your actual backend)
-    candidates.push('http://localhost:3001');
-    console.log(`[WhoRang] Adding localhost:3001 as high priority`);
-    
-    // 5. Smart detection based on current window location
+    // 3. Smart detection based on current window location
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     
-    // Same host with port 3001 (your backend port)
+    // Same host with different protocols and ports
     candidates.push(`${protocol}//${hostname}:3001`);
-    candidates.push(`http://${hostname}:3001`);        // Force HTTP for backend
+    if (protocol === 'https:') {
+      candidates.push(`http://${hostname}:3001`);
+    }
     
-    // Fallback to port 8080
-    candidates.push(`${protocol}//${hostname}:8080`);
-    candidates.push(`http://${hostname}:8080`);
-    
-    // 6. Common configurations
+    // 4. Common Home Assistant configurations
     if (hostname !== 'homeassistant.local') {
       candidates.push('http://homeassistant.local:3001');
-      candidates.push('http://homeassistant.local:8080');
     }
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      candidates.push('http://localhost:3001');
       candidates.push('http://127.0.0.1:3001');
-      candidates.push('http://127.0.0.1:8080');
     }
     
-    // 7. Your specific backend IP (lower priority)
-    candidates.push('http://192.168.86.163:3001');
-    candidates.push('http://192.168.86.163:8080');
+    // 5. Additional fallback URLs from config
+    if (this.config.fallback_urls && Array.isArray(this.config.fallback_urls)) {
+      candidates.push(...this.config.fallback_urls.map(url => url.replace(/\/$/, '')));
+    }
     
     // Remove duplicates while preserving order
-    const uniqueCandidates = [...new Set(candidates)];
-    console.log(`[WhoRang] Final URL candidates:`, uniqueCandidates);
-    return uniqueCandidates;
+    return [...new Set(candidates)];
   }
 
   async testImageUrl(url) {
@@ -481,62 +467,25 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   }
 
   async getWorkingAvatarUrl(person) {
-    console.log(`[WhoRang] Trying to load avatar for person: ${person.name} (ID: ${person.id})`);
-    
     // First try direct avatar URL from person data
     if (person.avatar_url) {
-      console.log(`[WhoRang] Trying direct avatar URL: ${person.avatar_url}`);
       if (await this.testImageUrl(person.avatar_url)) {
-        console.log(`[WhoRang] ✅ Direct avatar URL works: ${person.avatar_url}`);
         return person.avatar_url;
       }
     }
     
-    // Try constructed avatar URLs with different base URLs
+    // Try constructed URLs with different base URLs - EXACT SAME PATTERN AS FACE MANAGER
     const baseUrls = this.getWhoRangBaseUrlCandidates();
-    console.log(`[WhoRang] Trying ${baseUrls.length} base URL candidates for avatar:`, baseUrls);
     
     for (const baseUrl of baseUrls) {
-      // Try different avatar endpoint patterns
-      const avatarPatterns = [
-        `${baseUrl}/api/persons/${person.id}/avatar`,
-        `${baseUrl}/api/persons/${person.id}/image`,
-        `${baseUrl}/api/persons/${person.id}/thumbnail`,
-        `${baseUrl}/api/persons/${person.id}/face`,
-        `${baseUrl}/api/persons/${person.id}/photo`
-      ];
-      
-      for (const avatarUrl of avatarPatterns) {
-        console.log(`[WhoRang] Testing avatar URL: ${avatarUrl}`);
-        
-        if (await this.testImageUrl(avatarUrl)) {
-          console.log(`[WhoRang] ✅ Found working avatar URL: ${avatarUrl}`);
-          // Cache the working base URL for future use
-          this._workingBaseUrl = baseUrl;
-          return avatarUrl;
-        } else {
-          console.log(`[WhoRang] ❌ Failed: ${avatarUrl}`);
-        }
+      const avatarUrl = `${baseUrl}/api/persons/${person.id}/image?size=thumbnail`;
+      if (await this.testImageUrl(avatarUrl)) {
+        // Cache the working base URL for future use
+        this._workingBaseUrl = baseUrl;
+        return avatarUrl;
       }
     }
     
-    // If no avatar endpoint works, try to get the first face image for this person
-    console.log(`[WhoRang] No avatar endpoint works, trying to use first face image for person ${person.name}`);
-    
-    // Check if we have face data for this person
-    if (person.first_face_id) {
-      for (const baseUrl of baseUrls) {
-        const faceImageUrl = `${baseUrl}/api/faces/${person.first_face_id}/image?size=thumbnail`;
-        console.log(`[WhoRang] Testing first face image URL: ${faceImageUrl}`);
-        
-        if (await this.testImageUrl(faceImageUrl)) {
-          console.log(`[WhoRang] ✅ Using first face image as avatar: ${faceImageUrl}`);
-          return faceImageUrl;
-        }
-      }
-    }
-    
-    console.log(`[WhoRang] ❌ No working avatar URL found for person ${person.name}`);
     return null;
   }
 
