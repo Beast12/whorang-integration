@@ -229,7 +229,7 @@ AI_PROVIDERS: Final = [
 # Device information
 MANUFACTURER: Final = "WhoRang"
 MODEL: Final = "AI Doorbell System"
-SW_VERSION: Final = "1.0.0"
+SW_VERSION: Final = "1.1.0-dev"
 
 # Attributes
 ATTR_VISITOR_ID: Final = "visitor_id"
