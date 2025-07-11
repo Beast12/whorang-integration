@@ -407,3 +407,330 @@ merge_persons:
           min: 1
           max: 10000
           mode: box
+
+# Intelligent Automation Services (HA 2025+ Compatible)
+
+setup_camera_automation:
+  name: Setup Camera Automation
+  description: Configure intelligent doorbell automation for a camera entity
+  response: optional
+  fields:
+    camera_entity:
+      name: Camera Entity
+      description: Camera entity to monitor for doorbell events
+      required: true
+      selector:
+        entity:
+          domain: camera
+    monitor_mode:
+      name: Monitor Mode
+      description: How to detect doorbell events
+      required: false
+      default: "state_change"
+      selector:
+        select:
+          options:
+            - value: "state_change"
+              label: "Camera State Change"
+            - value: "webhook"
+              label: "External Webhook"
+            - value: "manual"
+              label: "Manual Trigger Only"
+    ai_prompt_template:
+      name: AI Prompt Template
+      description: AI prompt template for analysis
+      required: false
+      default: "professional"
+      selector:
+        select:
+          options:
+            - value: "professional"
+              label: "Professional Security"
+            - value: "friendly"
+              label: "Friendly Greeter"
+            - value: "sarcastic"
+              label: "Sarcastic Guard"
+            - value: "detailed"
+              label: "Detailed Analysis"
+            - value: "custom"
+              label: "Custom Prompt"
+    custom_ai_prompt:
+      name: Custom AI Prompt
+      description: Custom AI prompt (only used if template is 'custom')
+      required: false
+      selector:
+        text:
+          multiline: true
+    enable_notifications:
+      name: Enable Notifications
+      description: Enable intelligent notifications
+      required: false
+      default: true
+      selector:
+        boolean:
+    enable_media:
+      name: Enable Media
+      description: Enable media playback (sounds, TTS, displays)
+      required: false
+      default: true
+      selector:
+        boolean:
+    enable_weather_context:
+      name: Enable Weather Context
+      description: Include weather information in AI analysis
+      required: false
+      default: true
+      selector:
+        boolean:
+
+start_intelligent_monitoring:
+  name: Start Intelligent Monitoring
+  description: Begin intelligent doorbell monitoring
+  response: optional
+  fields:
+    camera_entity:
+      name: Camera Entity
+      description: Camera entity to monitor (optional if already configured)
+      required: false
+      selector:
+        entity:
+          domain: camera
+
+stop_intelligent_monitoring:
+  name: Stop Intelligent Monitoring
+  description: Stop intelligent doorbell monitoring
+  response: optional
+
+intelligent_notify:
+  name: Intelligent Notification
+  description: Send intelligent doorbell notification using templates
+  response: optional
+  fields:
+    template:
+      name: Notification Template
+      description: Notification template to use
+      required: false
+      default: "rich_media"
+      selector:
+        select:
+          options:
+            - value: "rich_media"
+              label: "Rich Media Notification"
+            - value: "simple"
+              label: "Simple Text Notification"
+            - value: "custom"
+              label: "Custom Template"
+    devices:
+      name: Target Devices
+      description: Notification devices to send to
+      required: true
+      selector:
+        target:
+          entity:
+            domain: notify
+    ai_result:
+      name: AI Analysis Result
+      description: AI analysis data (JSON object)
+      required: true
+      selector:
+        object:
+    snapshot_url:
+      name: Snapshot URL
+      description: URL to doorbell snapshot image
+      required: true
+      example: "http://homeassistant.local:8123/local/doorbell_snapshot.jpg"
+      selector:
+        text:
+    event_id:
+      name: Event ID
+      description: Unique event identifier (optional)
+      required: false
+      selector:
+        text:
+
+play_doorbell_sequence:
+  name: Play Doorbell Sequence
+  description: Play complete doorbell media sequence (sound + TTS + display)
+  response: optional
+  fields:
+    sequence_type:
+      name: Sequence Type
+      description: Type of media sequence to play
+      required: false
+      default: "full"
+      selector:
+        select:
+          options:
+            - value: "full"
+              label: "Full Sequence (Sound + TTS + Display)"
+            - value: "sound_only"
+              label: "Sound Only"
+            - value: "tts_only"
+              label: "TTS Only"
+            - value: "display_only"
+              label: "Display Only"
+    ai_message:
+      name: AI Message
+      description: Message for TTS announcement
+      required: false
+      example: "A delivery person is at the front door"
+      selector:
+        text:
+          multiline: true
+    snapshot_url:
+      name: Snapshot URL
+      description: Image URL to display on screens
+      required: false
+      example: "http://homeassistant.local:8123/local/doorbell_snapshot.jpg"
+      selector:
+        text:
+    target_players:
+      name: Media Players
+      description: Media players for sound and TTS
+      required: false
+      selector:
+        target:
+          entity:
+            domain: media_player
+    display_players:
+      name: Display Players
+      description: Media players for image display
+      required: false
+      selector:
+        target:
+          entity:
+            domain: media_player
+    doorbell_sound_file:
+      name: Doorbell Sound File
+      description: Path to doorbell sound file
+      required: false
+      default: "/local/sounds/doorbell.mp3"
+      example: "/local/sounds/doorbell.mp3"
+      selector:
+        text:
+    tts_service:
+      name: TTS Service
+      description: Text-to-speech service entity
+      required: false
+      selector:
+        entity:
+          domain: tts
+    display_duration:
+      name: Display Duration
+      description: How long to display image (seconds)
+      required: false
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 300
+          step: 5
+          mode: slider
+
+configure_ai_prompt:
+  name: Configure AI Prompt
+  description: Configure AI prompt template and settings
+  response: optional
+  fields:
+    template:
+      name: Prompt Template
+      description: AI prompt template to use
+      required: true
+      selector:
+        select:
+          options:
+            - value: "professional"
+              label: "Professional Security"
+            - value: "friendly"
+              label: "Friendly Greeter"
+            - value: "sarcastic"
+              label: "Sarcastic Guard"
+            - value: "detailed"
+              label: "Detailed Analysis"
+            - value: "custom"
+              label: "Custom Prompt"
+    custom_prompt:
+      name: Custom Prompt
+      description: Custom AI prompt text (required if template is 'custom')
+      required: false
+      selector:
+        text:
+          multiline: true
+    max_tokens:
+      name: Max Tokens
+      description: Maximum tokens for AI response
+      required: false
+      default: 150
+      selector:
+        number:
+          min: 50
+          max: 500
+          step: 10
+          mode: box
+    temperature:
+      name: Temperature
+      description: AI creativity level (0.0 = factual, 1.0 = creative)
+      required: false
+      default: 0.2
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.1
+          mode: slider
+    enable_weather_context:
+      name: Enable Weather Context
+      description: Include weather information in AI prompts
+      required: false
+      default: true
+      selector:
+        boolean:
+
+test_notification_template:
+  name: Test Notification Template
+  description: Test notification template with sample data
+  response: optional
+  fields:
+    template:
+      name: Notification Template
+      description: Template to test
+      required: true
+      selector:
+        select:
+          options:
+            - value: "rich_media"
+              label: "Rich Media Notification"
+            - value: "simple"
+              label: "Simple Text Notification"
+            - value: "custom"
+              label: "Custom Template"
+    devices:
+      name: Target Devices
+      description: Notification devices to test
+      required: true
+      selector:
+        target:
+          entity:
+            domain: notify
+    test_message:
+      name: Test Message
+      description: Test message content
+      required: false
+      default: "This is a test notification from WhoRang intelligent automation"
+      selector:
+        text:
+          multiline: true
+    test_title:
+      name: Test Title
+      description: Test notification title
+      required: false
+      default: "WhoRang Test"
+      selector:
+        text:
+    test_image_url:
+      name: Test Image URL
+      description: Test image URL for rich media notifications
+      required: false
+      example: "http://homeassistant.local:8123/local/test_image.jpg"
+      selector:
+        text:

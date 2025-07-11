@@ -39,6 +39,14 @@ from .const import (
     SERVICE_GET_UNKNOWN_FACES,
     SERVICE_DELETE_FACE,
     SERVICE_GET_FACE_SIMILARITIES,
+    # Intelligent Automation Services
+    SERVICE_SETUP_CAMERA_AUTOMATION,
+    SERVICE_START_INTELLIGENT_MONITORING,
+    SERVICE_STOP_INTELLIGENT_MONITORING,
+    SERVICE_INTELLIGENT_NOTIFY,
+    SERVICE_PLAY_DOORBELL_SEQUENCE,
+    SERVICE_CONFIGURE_AI_PROMPT,
+    SERVICE_TEST_NOTIFICATION_TEMPLATE,
     EVENT_FACE_LABELED,
     EVENT_PERSON_CREATED,
     EVENT_UNKNOWN_FACE_DETECTED,
@@ -969,4 +977,465 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             vol.Required("source_person_id"): int,
             vol.Required("target_person_id"): int,
         }),
+    )
+
+    # Intelligent Automation Services (HA 2025+ Compatible)
+
+    async def setup_camera_automation_service(call) -> Dict[str, Any]:
+        """Handle setup camera automation service call."""
+        from .intelligent_automation import IntelligentAutomationEngine
+        
+        camera_entity = call.data.get("camera_entity")
+        monitor_mode = call.data.get("monitor_mode", "state_change")
+        ai_prompt_template = call.data.get("ai_prompt_template", "professional")
+        custom_ai_prompt = call.data.get("custom_ai_prompt", "")
+        enable_notifications = call.data.get("enable_notifications", True)
+        enable_media = call.data.get("enable_media", True)
+        enable_weather_context = call.data.get("enable_weather_context", True)
+        
+        if not camera_entity:
+            _LOGGER.error("Camera entity is required for setting up automation")
+            return {"success": False, "error": "Camera entity is required"}
+        
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        results = []
+        for coordinator in coordinators:
+            try:
+                # Create automation configuration
+                automation_config = {
+                    "enable_intelligent_automation": True,
+                    "camera_entity": camera_entity,
+                    "camera_monitor_mode": monitor_mode,
+                    "ai_prompt_template": ai_prompt_template,
+                    "custom_ai_prompt": custom_ai_prompt,
+                    "enable_notifications": enable_notifications,
+                    "enable_media": enable_media,
+                    "enable_weather_context": enable_weather_context,
+                    "notification_devices": [],  # Will be configured separately
+                    "media_players": [],  # Will be configured separately
+                    "display_players": [],  # Will be configured separately
+                }
+                
+                # Store automation engine in coordinator
+                if not hasattr(coordinator, 'automation_engine'):
+                    coordinator.automation_engine = IntelligentAutomationEngine(
+                        hass, coordinator, automation_config
+                    )
+                else:
+                    # Update existing configuration
+                    coordinator.automation_engine.config.update(automation_config)
+                
+                _LOGGER.info("Successfully configured camera automation for %s", camera_entity)
+                results.append({
+                    "coordinator": str(coordinator),
+                    "success": True,
+                    "camera_entity": camera_entity
+                })
+                
+            except Exception as err:
+                _LOGGER.error("Failed to setup camera automation: %s", err)
+                results.append({
+                    "coordinator": str(coordinator),
+                    "success": False,
+                    "error": str(err)
+                })
+        
+        return {
+            "success": any(r["success"] for r in results),
+            "results": results,
+            "camera_entity": camera_entity
+        }
+
+    async def start_intelligent_monitoring_service(call) -> Dict[str, Any]:
+        """Handle start intelligent monitoring service call."""
+        camera_entity = call.data.get("camera_entity")
+        
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        results = []
+        for coordinator in coordinators:
+            try:
+                if hasattr(coordinator, 'automation_engine'):
+                    # Update camera entity if provided
+                    if camera_entity:
+                        coordinator.automation_engine.config["camera_entity"] = camera_entity
+                    
+                    success = await coordinator.automation_engine.async_start()
+                    if success:
+                        _LOGGER.info("Successfully started intelligent monitoring")
+                        results.append({"coordinator": str(coordinator), "success": True})
+                    else:
+                        _LOGGER.error("Failed to start intelligent monitoring")
+                        results.append({"coordinator": str(coordinator), "success": False, "error": "Failed to start"})
+                else:
+                    _LOGGER.error("No automation engine configured. Run setup_camera_automation first.")
+                    results.append({"coordinator": str(coordinator), "success": False, "error": "No automation engine"})
+                    
+            except Exception as err:
+                _LOGGER.error("Error starting intelligent monitoring: %s", err)
+                results.append({"coordinator": str(coordinator), "success": False, "error": str(err)})
+        
+        return {
+            "success": any(r["success"] for r in results),
+            "results": results
+        }
+
+    async def stop_intelligent_monitoring_service(call) -> Dict[str, Any]:
+        """Handle stop intelligent monitoring service call."""
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        results = []
+        for coordinator in coordinators:
+            try:
+                if hasattr(coordinator, 'automation_engine'):
+                    success = await coordinator.automation_engine.async_stop()
+                    if success:
+                        _LOGGER.info("Successfully stopped intelligent monitoring")
+                        results.append({"coordinator": str(coordinator), "success": True})
+                    else:
+                        _LOGGER.error("Failed to stop intelligent monitoring")
+                        results.append({"coordinator": str(coordinator), "success": False, "error": "Failed to stop"})
+                else:
+                    _LOGGER.warning("No automation engine to stop")
+                    results.append({"coordinator": str(coordinator), "success": True, "message": "No engine to stop"})
+                    
+            except Exception as err:
+                _LOGGER.error("Error stopping intelligent monitoring: %s", err)
+                results.append({"coordinator": str(coordinator), "success": False, "error": str(err)})
+        
+        return {
+            "success": any(r["success"] for r in results),
+            "results": results
+        }
+
+    async def intelligent_notify_service(call) -> Dict[str, Any]:
+        """Handle intelligent notification service call."""
+        from .intelligent_automation import IntelligentNotificationService
+        
+        template = call.data.get("template", "rich_media")
+        devices = call.data.get("devices", [])
+        ai_result = call.data.get("ai_result", {})
+        snapshot_url = call.data.get("snapshot_url")
+        event_id = call.data.get("event_id", "manual")
+        
+        if not devices or not snapshot_url:
+            _LOGGER.error("Devices and snapshot URL are required for intelligent notifications")
+            return {"success": False, "error": "Missing required parameters"}
+        
+        try:
+            # Extract device entity IDs from target selector
+            device_list = []
+            if isinstance(devices, dict) and "entity_id" in devices:
+                if isinstance(devices["entity_id"], list):
+                    device_list = devices["entity_id"]
+                else:
+                    device_list = [devices["entity_id"]]
+            elif isinstance(devices, list):
+                device_list = devices
+            
+            # Create notification service
+            notification_service = IntelligentNotificationService(
+                hass, device_list, template
+            )
+            
+            # Send notifications
+            result = await notification_service.send_notifications(
+                ai_result, snapshot_url, event_id
+            )
+            
+            _LOGGER.info("Intelligent notification result: %s", result)
+            return result
+            
+        except Exception as err:
+            _LOGGER.error("Error sending intelligent notifications: %s", err)
+            return {"success": False, "error": str(err)}
+
+    async def play_doorbell_sequence_service(call) -> Dict[str, Any]:
+        """Handle play doorbell sequence service call."""
+        from .intelligent_automation import MediaIntegrationService
+        
+        sequence_type = call.data.get("sequence_type", "full")
+        ai_message = call.data.get("ai_message", "")
+        snapshot_url = call.data.get("snapshot_url", "")
+        target_players = call.data.get("target_players", [])
+        display_players = call.data.get("display_players", [])
+        doorbell_sound_file = call.data.get("doorbell_sound_file", "/local/sounds/doorbell.mp3")
+        tts_service = call.data.get("tts_service")
+        display_duration = call.data.get("display_duration", 15)
+        
+        try:
+            # Extract player entity IDs from target selectors
+            media_player_list = []
+            display_player_list = []
+            
+            if isinstance(target_players, dict) and "entity_id" in target_players:
+                if isinstance(target_players["entity_id"], list):
+                    media_player_list = target_players["entity_id"]
+                else:
+                    media_player_list = [target_players["entity_id"]]
+            elif isinstance(target_players, list):
+                media_player_list = target_players
+            
+            if isinstance(display_players, dict) and "entity_id" in display_players:
+                if isinstance(display_players["entity_id"], list):
+                    display_player_list = display_players["entity_id"]
+                else:
+                    display_player_list = [display_players["entity_id"]]
+            elif isinstance(display_players, list):
+                display_player_list = display_players
+            
+            # Create media service
+            media_service = MediaIntegrationService(
+                hass,
+                media_player_list,
+                display_player_list,
+                doorbell_sound_file,
+                tts_service,
+                display_duration
+            )
+            
+            # Play sequence based on type
+            if sequence_type == "full":
+                result = await media_service.play_doorbell_sequence(
+                    ai_message, snapshot_url, "manual"
+                )
+            elif sequence_type == "sound_only":
+                await media_service._play_doorbell_sound()
+                result = {"success": True, "actions": ["doorbell_sound"]}
+            elif sequence_type == "tts_only":
+                await media_service._play_tts_announcement(ai_message)
+                result = {"success": True, "actions": ["tts_announcement"]}
+            elif sequence_type == "display_only":
+                await media_service._display_snapshot(snapshot_url)
+                result = {"success": True, "actions": ["snapshot_display"]}
+            else:
+                result = {"success": False, "error": "Invalid sequence type"}
+            
+            _LOGGER.info("Doorbell sequence result: %s", result)
+            return result
+            
+        except Exception as err:
+            _LOGGER.error("Error playing doorbell sequence: %s", err)
+            return {"success": False, "error": str(err)}
+
+    async def configure_ai_prompt_service(call) -> Dict[str, Any]:
+        """Handle configure AI prompt service call."""
+        template = call.data.get("template")
+        custom_prompt = call.data.get("custom_prompt", "")
+        max_tokens = call.data.get("max_tokens", 150)
+        temperature = call.data.get("temperature", 0.2)
+        enable_weather_context = call.data.get("enable_weather_context", True)
+        
+        if not template:
+            _LOGGER.error("Template is required for configuring AI prompt")
+            return {"success": False, "error": "Template is required"}
+        
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        results = []
+        for coordinator in coordinators:
+            try:
+                if hasattr(coordinator, 'automation_engine'):
+                    # Update AI prompt configuration
+                    coordinator.automation_engine.config.update({
+                        "ai_prompt_template": template,
+                        "custom_ai_prompt": custom_prompt,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "enable_weather_context": enable_weather_context
+                    })
+                    
+                    _LOGGER.info("Successfully configured AI prompt template: %s", template)
+                    results.append({
+                        "coordinator": str(coordinator),
+                        "success": True,
+                        "template": template
+                    })
+                else:
+                    _LOGGER.error("No automation engine configured. Run setup_camera_automation first.")
+                    results.append({
+                        "coordinator": str(coordinator),
+                        "success": False,
+                        "error": "No automation engine"
+                    })
+                    
+            except Exception as err:
+                _LOGGER.error("Error configuring AI prompt: %s", err)
+                results.append({
+                    "coordinator": str(coordinator),
+                    "success": False,
+                    "error": str(err)
+                })
+        
+        return {
+            "success": any(r["success"] for r in results),
+            "results": results,
+            "template": template
+        }
+
+    async def test_notification_template_service(call) -> Dict[str, Any]:
+        """Handle test notification template service call."""
+        from .intelligent_automation import IntelligentNotificationService
+        
+        template = call.data.get("template")
+        devices = call.data.get("devices", [])
+        test_message = call.data.get("test_message", "This is a test notification from WhoRang intelligent automation")
+        test_title = call.data.get("test_title", "WhoRang Test")
+        test_image_url = call.data.get("test_image_url", "")
+        
+        if not template or not devices:
+            _LOGGER.error("Template and devices are required for testing notifications")
+            return {"success": False, "error": "Missing required parameters"}
+        
+        try:
+            # Extract device entity IDs from target selector
+            device_list = []
+            if isinstance(devices, dict) and "entity_id" in devices:
+                if isinstance(devices["entity_id"], list):
+                    device_list = devices["entity_id"]
+                else:
+                    device_list = [devices["entity_id"]]
+            elif isinstance(devices, list):
+                device_list = devices
+            
+            # Create test AI result
+            test_ai_result = {
+                "title": test_title,
+                "description": test_message,
+                "confidence": 0.9,
+                "faces_detected": 1,
+                "objects_detected": ["person"],
+                "processing_time": 1.5,
+                "ai_provider": "test",
+                "cost_usd": 0.0
+            }
+            
+            # Create notification service
+            notification_service = IntelligentNotificationService(
+                hass, device_list, template
+            )
+            
+            # Send test notifications
+            result = await notification_service.send_notifications(
+                test_ai_result,
+                test_image_url or "http://homeassistant.local:8123/local/test_image.jpg",
+                "test"
+            )
+            
+            _LOGGER.info("Test notification result: %s", result)
+            return result
+            
+        except Exception as err:
+            _LOGGER.error("Error testing notification template: %s", err)
+            return {"success": False, "error": str(err)}
+
+    # Register intelligent automation services with HA 2025+ features
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SETUP_CAMERA_AUTOMATION,
+        setup_camera_automation_service,
+        schema=vol.Schema({
+            vol.Required("camera_entity"): str,
+            vol.Optional("monitor_mode", default="state_change"): vol.In(["state_change", "webhook", "manual"]),
+            vol.Optional("ai_prompt_template", default="professional"): vol.In(["professional", "friendly", "sarcastic", "detailed", "custom"]),
+            vol.Optional("custom_ai_prompt"): str,
+            vol.Optional("enable_notifications", default=True): bool,
+            vol.Optional("enable_media", default=True): bool,
+            vol.Optional("enable_weather_context", default=True): bool,
+        }),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_START_INTELLIGENT_MONITORING,
+        start_intelligent_monitoring_service,
+        schema=vol.Schema({
+            vol.Optional("camera_entity"): str,
+        }),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_STOP_INTELLIGENT_MONITORING,
+        stop_intelligent_monitoring_service,
+        schema=vol.Schema({}),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_INTELLIGENT_NOTIFY,
+        intelligent_notify_service,
+        schema=vol.Schema({
+            vol.Optional("template", default="rich_media"): vol.In(["rich_media", "simple", "custom"]),
+            vol.Required("devices"): vol.Any(dict, list),  # Target selector or list
+            vol.Required("ai_result"): dict,
+            vol.Required("snapshot_url"): str,
+            vol.Optional("event_id"): str,
+        }),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_PLAY_DOORBELL_SEQUENCE,
+        play_doorbell_sequence_service,
+        schema=vol.Schema({
+            vol.Optional("sequence_type", default="full"): vol.In(["full", "sound_only", "tts_only", "display_only"]),
+            vol.Optional("ai_message"): str,
+            vol.Optional("snapshot_url"): str,
+            vol.Optional("target_players"): vol.Any(dict, list),  # Target selector or list
+            vol.Optional("display_players"): vol.Any(dict, list),  # Target selector or list
+            vol.Optional("doorbell_sound_file", default="/local/sounds/doorbell.mp3"): str,
+            vol.Optional("tts_service"): str,
+            vol.Optional("display_duration", default=15): vol.All(int, vol.Range(min=5, max=300)),
+        }),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CONFIGURE_AI_PROMPT,
+        configure_ai_prompt_service,
+        schema=vol.Schema({
+            vol.Required("template"): vol.In(["professional", "friendly", "sarcastic", "detailed", "custom"]),
+            vol.Optional("custom_prompt"): str,
+            vol.Optional("max_tokens", default=150): vol.All(int, vol.Range(min=50, max=500)),
+            vol.Optional("temperature", default=0.2): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+            vol.Optional("enable_weather_context", default=True): bool,
+        }),
+        supports_response=True,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_TEST_NOTIFICATION_TEMPLATE,
+        test_notification_template_service,
+        schema=vol.Schema({
+            vol.Required("template"): vol.In(["rich_media", "simple", "custom"]),
+            vol.Required("devices"): vol.Any(dict, list),  # Target selector or list
+            vol.Optional("test_message", default="This is a test notification from WhoRang intelligent automation"): str,
+            vol.Optional("test_title", default="WhoRang Test"): str,
+            vol.Optional("test_image_url"): str,
+        }),
+        supports_response=True,
     )

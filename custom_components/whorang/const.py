@@ -20,6 +20,24 @@ CONF_OLLAMA_HOST: Final = "ollama_host"
 CONF_OLLAMA_PORT: Final = "ollama_port"
 CONF_OLLAMA_ENABLED: Final = "ollama_enabled"
 
+# Intelligent Automation Configuration
+CONF_ENABLE_INTELLIGENT_AUTOMATION: Final = "enable_intelligent_automation"
+CONF_CAMERA_ENTITY: Final = "camera_entity"
+CONF_CAMERA_MONITOR_MODE: Final = "camera_monitor_mode"
+CONF_AI_PROMPT_TEMPLATE: Final = "ai_prompt_template"
+CONF_CUSTOM_AI_PROMPT: Final = "custom_ai_prompt"
+CONF_ENABLE_NOTIFICATIONS: Final = "enable_notifications"
+CONF_NOTIFICATION_DEVICES: Final = "notification_devices"
+CONF_NOTIFICATION_TEMPLATE: Final = "notification_template"
+CONF_ENABLE_MEDIA: Final = "enable_media"
+CONF_DOORBELL_SOUND_FILE: Final = "doorbell_sound_file"
+CONF_TTS_SERVICE: Final = "tts_service"
+CONF_MEDIA_PLAYERS: Final = "media_players"
+CONF_DISPLAY_PLAYERS: Final = "display_players"
+CONF_DISPLAY_DURATION: Final = "display_duration"
+CONF_ENABLE_WEATHER_CONTEXT: Final = "enable_weather_context"
+CONF_WEATHER_ENTITY: Final = "weather_entity"
+
 # Default values
 DEFAULT_PORT: Final = 3001
 DEFAULT_UPDATE_INTERVAL: Final = 30
@@ -27,6 +45,88 @@ DEFAULT_TIMEOUT: Final = 10
 DEFAULT_WEBSOCKET_TIMEOUT: Final = 30
 DEFAULT_OLLAMA_HOST: Final = "localhost"
 DEFAULT_OLLAMA_PORT: Final = 11434
+
+# Intelligent Automation Defaults
+DEFAULT_CAMERA_MONITOR_MODE: Final = "state_change"
+DEFAULT_AI_PROMPT_TEMPLATE: Final = "professional"
+DEFAULT_NOTIFICATION_TEMPLATE: Final = "rich_media"
+DEFAULT_DISPLAY_DURATION: Final = 15
+DEFAULT_DOORBELL_SOUND: Final = "/local/sounds/doorbell.mp3"
+
+# AI Prompt Templates
+AI_PROMPT_TEMPLATES: Final = {
+    "professional": {
+        "name": "Professional Security",
+        "prompt": "Analyze this doorbell camera image and provide a professional security description. Focus on identifying people, vehicles, packages, and any security-relevant details. Be precise and factual.",
+        "max_tokens": 150,
+        "temperature": 0.1
+    },
+    "friendly": {
+        "name": "Friendly Greeter",
+        "prompt": "Describe what you see at the front door in a friendly, welcoming manner. Focus on visitors and any deliveries or interesting details.",
+        "max_tokens": 120,
+        "temperature": 0.3
+    },
+    "sarcastic": {
+        "name": "Sarcastic Guard",
+        "prompt": "You are my sarcastic funny security guard. Describe what you see. Don't mention trees, bushes, grass, landscape, driveway, light fixtures, yard, brick, wall, garden. Don't mention the time and date. Be precise and short in one funny one liner of max 10 words. Only describe the person, vehicle or the animal.",
+        "max_tokens": 100,
+        "temperature": 0.2
+    },
+    "detailed": {
+        "name": "Detailed Analysis",
+        "prompt": "Provide a comprehensive analysis of this doorbell image including people, objects, weather conditions, lighting, and any notable details. Include confidence levels for your observations.",
+        "max_tokens": 200,
+        "temperature": 0.1
+    },
+    "custom": {
+        "name": "Custom Prompt",
+        "prompt": "",
+        "max_tokens": 150,
+        "temperature": 0.2
+    }
+}
+
+# Notification Templates
+NOTIFICATION_TEMPLATES: Final = {
+    "rich_media": {
+        "name": "Rich Media Notification",
+        "title": "{{ ai_title | default('Doorbell') }}",
+        "message": "{{ ai_description }}",
+        "data": {
+            "image": "{{ snapshot_url }}",
+            "ttl": 0,
+            "priority": "high",
+            "clickAction": "{{ snapshot_url }}",
+            "actions": [
+                {"action": "VIEW_PHOTO", "title": "📷 View Photo"},
+                {"action": "OPEN_CAMERA", "title": "📹 Live Camera"},
+                {"action": "DISMISS", "title": "❌ Dismiss"}
+            ]
+        }
+    },
+    "simple": {
+        "name": "Simple Text Notification",
+        "title": "{{ ai_title | default('Doorbell') }}",
+        "message": "{{ ai_description }}",
+        "data": {
+            "priority": "high"
+        }
+    },
+    "custom": {
+        "name": "Custom Template",
+        "title": "{{ ai_title }}",
+        "message": "{{ ai_description }}",
+        "data": {}
+    }
+}
+
+# Camera Monitor Modes
+CAMERA_MONITOR_MODES: Final = {
+    "state_change": "Camera State Change",
+    "webhook": "External Webhook",
+    "manual": "Manual Trigger Only"
+}
 
 # API endpoints
 API_HEALTH: Final = "/health"
@@ -98,6 +198,15 @@ SERVICE_GET_UNKNOWN_FACES: Final = "get_unknown_faces"
 SERVICE_DELETE_FACE: Final = "delete_face"
 SERVICE_GET_FACE_SIMILARITIES: Final = "get_face_similarities"
 
+# Intelligent Automation Services (HA 2025+ Compatible)
+SERVICE_SETUP_CAMERA_AUTOMATION: Final = "setup_camera_automation"
+SERVICE_START_INTELLIGENT_MONITORING: Final = "start_intelligent_monitoring"
+SERVICE_STOP_INTELLIGENT_MONITORING: Final = "stop_intelligent_monitoring"
+SERVICE_INTELLIGENT_NOTIFY: Final = "intelligent_notify"
+SERVICE_PLAY_DOORBELL_SEQUENCE: Final = "play_doorbell_sequence"
+SERVICE_CONFIGURE_AI_PROMPT: Final = "configure_ai_prompt"
+SERVICE_TEST_NOTIFICATION_TEMPLATE: Final = "test_notification_template"
+
 # WebSocket message types
 WS_TYPE_NEW_VISITOR: Final = "new_visitor"
 WS_TYPE_CONNECTION_STATUS: Final = "connection_status"
@@ -156,6 +265,15 @@ EVENT_FACE_DETECTION_COMPLETE: Final = f"{DOMAIN}_face_detection_complete"
 EVENT_UNKNOWN_FACE_DETECTED: Final = f"{DOMAIN}_unknown_face_detected"
 EVENT_FACE_LABELED: Final = f"{DOMAIN}_face_labeled"
 EVENT_PERSON_CREATED: Final = f"{DOMAIN}_person_created"
+
+# Intelligent Automation Events (HA 2025+ Compatible)
+EVENT_DOORBELL_DETECTED: Final = f"{DOMAIN}_doorbell_detected"
+EVENT_CAMERA_SNAPSHOT_CAPTURED: Final = f"{DOMAIN}_camera_snapshot_captured"
+EVENT_INTELLIGENT_ANALYSIS_COMPLETE: Final = f"{DOMAIN}_intelligent_analysis_complete"
+EVENT_NOTIFICATION_SENT: Final = f"{DOMAIN}_notification_sent"
+EVENT_MEDIA_PLAYBACK_COMPLETE: Final = f"{DOMAIN}_media_playback_complete"
+EVENT_AUTOMATION_STARTED: Final = f"{DOMAIN}_automation_started"
+EVENT_AUTOMATION_STOPPED: Final = f"{DOMAIN}_automation_stopped"
 
 # Error messages
 ERROR_CANNOT_CONNECT: Final = "cannot_connect"
