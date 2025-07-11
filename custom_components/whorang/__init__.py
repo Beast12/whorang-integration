@@ -986,7 +986,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         from .intelligent_automation import IntelligentAutomationEngine
         
         camera_entity = call.data.get("camera_entity")
-        monitor_mode = call.data.get("monitor_mode", "state_change")
+        doorbell_trigger_entity = call.data.get("doorbell_trigger_entity")
+        monitor_mode = call.data.get("monitor_mode", "trigger_entity")
         ai_prompt_template = call.data.get("ai_prompt_template", "professional")
         custom_ai_prompt = call.data.get("custom_ai_prompt", "")
         enable_notifications = call.data.get("enable_notifications", True)
@@ -996,6 +997,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         if not camera_entity:
             _LOGGER.error("Camera entity is required for setting up automation")
             return {"success": False, "error": "Camera entity is required"}
+        
+        if not doorbell_trigger_entity:
+            _LOGGER.error("Doorbell trigger entity is required for setting up automation")
+            return {"success": False, "error": "Doorbell trigger entity is required"}
         
         # Get all coordinators
         coordinators = [
@@ -1010,6 +1015,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 automation_config = {
                     "enable_intelligent_automation": True,
                     "camera_entity": camera_entity,
+                    "doorbell_trigger_entity": doorbell_trigger_entity,
                     "camera_monitor_mode": monitor_mode,
                     "ai_prompt_template": ai_prompt_template,
                     "custom_ai_prompt": custom_ai_prompt,
@@ -1353,7 +1359,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         setup_camera_automation_service,
         schema=vol.Schema({
             vol.Required("camera_entity"): str,
-            vol.Optional("monitor_mode", default="state_change"): vol.In(["state_change", "webhook", "manual"]),
+            vol.Required("doorbell_trigger_entity"): str,
+            vol.Optional("monitor_mode", default="trigger_entity"): vol.In(["trigger_entity", "camera_state", "webhook", "manual"]),
             vol.Optional("ai_prompt_template", default="professional"): vol.In(["professional", "friendly", "sarcastic", "detailed", "custom"]),
             vol.Optional("custom_ai_prompt"): str,
             vol.Optional("enable_notifications", default=True): bool,

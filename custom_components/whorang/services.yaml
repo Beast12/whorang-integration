@@ -417,21 +417,32 @@ setup_camera_automation:
   fields:
     camera_entity:
       name: Camera Entity
-      description: Camera entity to monitor for doorbell events
+      description: Your doorbell camera entity
       required: true
+      example: "camera.reolink_video_doorbell_wifi_fluent"
       selector:
         entity:
           domain: camera
+    doorbell_trigger_entity:
+      name: Doorbell Trigger Entity
+      description: Binary sensor that triggers when doorbell is pressed (visitor/motion detection)
+      required: true
+      example: "binary_sensor.reolink_video_doorbell_wifi_visitor"
+      selector:
+        entity:
+          domain: binary_sensor
     monitor_mode:
       name: Monitor Mode
       description: How to detect doorbell events
       required: false
-      default: "state_change"
+      default: "trigger_entity"
       selector:
         select:
           options:
-            - value: "state_change"
-              label: "Camera State Change"
+            - value: "trigger_entity"
+              label: "Monitor Doorbell Trigger Entity"
+            - value: "camera_state"
+              label: "Monitor Camera State Change"
             - value: "webhook"
               label: "External Webhook"
             - value: "manual"
