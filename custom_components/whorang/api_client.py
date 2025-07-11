@@ -750,8 +750,25 @@ class WhoRangAPIClient:
         This replaces the original rest_command.doorbell_webhook functionality.
         """
         try:
+            # Extract automation config if provided
+            automation_config = payload.get("automation_config", {})
+            
+            # Prepare enhanced payload with AI template configuration
+            enhanced_payload = payload.copy()
+            
+            # Add AI template configuration to the payload
+            if automation_config:
+                enhanced_payload.update({
+                    "ai_prompt_template": automation_config.get("ai_prompt_template", "professional"),
+                    "custom_ai_prompt": automation_config.get("custom_ai_prompt", ""),
+                    "enable_weather_context": automation_config.get("enable_weather_context", True)
+                })
+                
+                _LOGGER.info("Sending AI template configuration to backend: %s", 
+                           automation_config.get("ai_prompt_template", "professional"))
+            
             # Send the doorbell event to the backend webhook endpoint
-            response = await self._request("POST", "/api/webhook/doorbell", data=payload)
+            response = await self._request("POST", "/api/webhook/doorbell", data=enhanced_payload)
             
             # Check if the request was successful
             # The webhook returns the created event object, so check for visitor_id

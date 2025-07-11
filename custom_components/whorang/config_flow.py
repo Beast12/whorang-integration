@@ -503,6 +503,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Get current intelligent automation settings
         current_automation = self.config_entry.options.get("intelligent_automation", {})
         
+        # Debug: Log current automation settings
+        _LOGGER.debug("Current automation settings from config: %s", current_automation)
+        
         # Auto-discover TTS services
         tts_services = [entity_id for entity_id in self.hass.states.async_entity_ids("tts")]
         tts_options = [""] + tts_services  # Empty option for "none"
