@@ -505,6 +505,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         
         # Debug: Log current automation settings
         _LOGGER.debug("Current automation settings from config: %s", current_automation)
+        _LOGGER.debug("Current AI prompt template: %s", current_automation.get("ai_prompt_template", "professional"))
+        _LOGGER.debug("Full config entry options: %s", self.config_entry.options)
         
         # Auto-discover TTS services
         tts_services = [entity_id for entity_id in self.hass.states.async_entity_ids("tts")]

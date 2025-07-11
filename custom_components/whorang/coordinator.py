@@ -781,9 +781,30 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         return False
 
     async def async_trigger_analysis(self, visitor_id: Optional[str] = None) -> bool:
-        """Trigger AI analysis for a visitor."""
+        """Trigger AI analysis for a visitor with Home Assistant configuration."""
         try:
-            await self.api_client.trigger_analysis(visitor_id)
+            # Get the Home Assistant configuration entry to pass AI template settings
+            config_entry = None
+            for entry in self.hass.config_entries.async_entries(DOMAIN):
+                if entry.state.name == "loaded":
+                    config_entry = entry
+                    break
+            
+            # Extract AI template configuration from Home Assistant options
+            ai_template_config = {}
+            if config_entry and config_entry.options:
+                automation_config = config_entry.options.get("intelligent_automation", {})
+                ai_template_config = {
+                    "ai_prompt_template": automation_config.get("ai_prompt_template", "professional"),
+                    "custom_ai_prompt": automation_config.get("custom_ai_prompt", ""),
+                    "enable_weather_context": automation_config.get("enable_weather_context", True)
+                }
+                
+                _LOGGER.info("Triggering analysis with AI template: %s", 
+                           ai_template_config.get("ai_prompt_template", "professional"))
+            
+            # Call the enhanced trigger analysis method
+            await self.api_client.trigger_analysis_with_config(visitor_id, ai_template_config)
             return True
         except Exception as err:
             _LOGGER.error("Failed to trigger analysis: %s", err)

@@ -376,6 +376,23 @@ class WhoRangAPIClient:
             _LOGGER.error("Failed to trigger analysis: %s", err)
             raise
 
+    async def trigger_analysis_with_config(self, visitor_id: Optional[str] = None, ai_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Trigger AI analysis for a visitor with AI template configuration."""
+        endpoint = "/api/analysis/trigger"
+        data = {}
+        if visitor_id:
+            data["visitor_id"] = visitor_id
+        
+        # Add AI template configuration if provided
+        if ai_config:
+            data.update(ai_config)
+            
+        try:
+            return await self._request("POST", endpoint, data=data)
+        except Exception as err:
+            _LOGGER.error("Failed to trigger analysis with config: %s", err)
+            raise
+
     async def get_latest_image(self) -> Optional[bytes]:
         """Get the latest doorbell image."""
         try:
