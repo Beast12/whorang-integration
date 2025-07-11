@@ -11,17 +11,35 @@ WhoRang includes sophisticated face recognition capabilities that allow you to:
 - **Manage person profiles** with avatars
 - **Track visitor patterns** and statistics
 
-## 🎨 Visual Face Manager
+## 🎨 Visual Face Management System
 
-### What is the Visual Face Manager?
+### What are the Visual Face Management Cards?
 
-The Visual Face Manager is an interactive dashboard card that provides a user-friendly interface for managing face recognition. It's included with the integration and provides:
+The WhoRang integration includes **3 sophisticated custom cards** for complete face management:
 
-- **Visual face gallery** with thumbnail images
-- **Click-to-select** interface for labeling faces
-- **Batch operations** for labeling multiple faces
-- **Progress tracking** for labeling completion
-- **Quality indicators** for face detection confidence
+#### **1. Face Manager Card** - `whorang-face-manager-card`
+**Full-featured visual face labeling interface**
+- **Interactive Selection**: Click faces to select them (blue border indicates selection)
+- **Batch Operations**: Label multiple faces as the same person
+- **Progress Tracking**: Visual progress of face labeling completion
+- **Quality Indicators**: Face detection quality scores and confidence levels
+- **Smart Image Loading**: Automatic backend URL detection and fallback
+- **Responsive Design**: Adapts to different screen sizes
+
+#### **2. Face Manager Simple Card** - `whorang-face-manager-simple-card`
+**Lightweight version for basic face labeling**
+- **Simplified Interface**: Clean, minimal design
+- **Essential Features**: Face selection and labeling
+- **Lower Resource Usage**: Ideal for slower devices
+- **Quick Setup**: Minimal configuration required
+
+#### **3. Known Persons Card** - `whorang-known-persons-card`
+**Gallery of known persons with avatars and statistics**
+- **Person Avatars**: Visual representation of known persons
+- **Statistics Display**: Face counts, last seen dates, recognition stats
+- **Person Management**: Edit, delete, and manage known persons
+- **Face Viewing**: View all faces associated with each person
+- **Confidence Indicators**: Recognition confidence levels
 
 ### Setting Up the Visual Face Manager
 
@@ -29,7 +47,9 @@ The Visual Face Manager is an interactive dashboard card that provides a user-fr
    - Use the complete dashboard from [`examples/dashboard.yaml`](../../examples/dashboard.yaml)
    - Or add the face manager card to your existing dashboard
 
-2. **Basic Face Manager Card**:
+2. **Card Configuration Examples**:
+
+   **Full-Featured Face Manager Card:**
    ```yaml
    type: custom:whorang-face-manager-card
    entity: sensor.whorang_ai_doorbell_face_gallery
@@ -38,6 +58,26 @@ The Visual Face Manager is an interactive dashboard card that provides a user-fr
    columns: 4
    show_progress: true
    show_controls: true
+   ```
+
+   **Simple Face Manager Card:**
+   ```yaml
+   type: custom:whorang-face-manager-simple-card
+   entity: sensor.whorang_ai_doorbell_face_gallery
+   whorang_url: http://localhost:3001  # Update to your backend URL
+   title: Simple Face Manager
+   ```
+
+   **Known Persons Gallery Card:**
+   ```yaml
+   type: custom:whorang-known-persons-card
+   entity: sensor.whorang_ai_doorbell_known_persons_gallery
+   whorang_url: http://localhost:3001  # Update to your backend URL
+   title: Known Persons
+   columns: 3
+   show_stats: true
+   show_last_seen: true
+   show_face_count: true
    ```
 
 3. **Configure Backend URL**:

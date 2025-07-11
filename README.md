@@ -153,16 +153,32 @@ Choose and install the backend service using one of the methods above.
 Dynamic device trackers are created for each known person:
 - `device_tracker.whorang_ai_doorbell_visitors_[person_name]` - Presence tracking for known visitors
 
-### 🎨 Visual Face Manager
-The integration includes a sophisticated **visual face management interface**:
+### 🎨 Visual Face Management System
+The integration includes **3 sophisticated custom cards** for complete face management:
 
-- **Custom Card**: `whorang-face-manager-card` for interactive face labeling
-- **Face Gallery Sensor**: Provides unknown faces with full image URLs
-- **Known Persons Gallery**: Displays known people with avatars
-- **Interactive Interface**: Click faces to select and label them
+#### **1. Face Manager Card** - `whorang-face-manager-card`
+**Full-featured visual face labeling interface**
+- **Interactive Selection**: Click faces to select them (blue border indicates selection)
 - **Batch Operations**: Label multiple faces as the same person
 - **Progress Tracking**: Visual progress of face labeling completion
 - **Quality Indicators**: Face detection quality scores and confidence levels
+- **Smart Image Loading**: Automatic backend URL detection and fallback
+- **Responsive Design**: Adapts to different screen sizes
+
+#### **2. Face Manager Simple Card** - `whorang-face-manager-simple-card`
+**Lightweight version for basic face labeling**
+- **Simplified Interface**: Clean, minimal design
+- **Essential Features**: Face selection and labeling
+- **Lower Resource Usage**: Ideal for slower devices
+- **Quick Setup**: Minimal configuration required
+
+#### **3. Known Persons Card** - `whorang-known-persons-card`
+**Gallery of known persons with avatars and statistics**
+- **Person Avatars**: Visual representation of known persons
+- **Statistics Display**: Face counts, last seen dates, recognition stats
+- **Person Management**: Edit, delete, and manage known persons
+- **Face Viewing**: View all faces associated with each person
+- **Confidence Indicators**: Recognition confidence levels
 
 See the complete dashboard configuration in [`examples/dashboard.yaml`](examples/dashboard.yaml).
 
