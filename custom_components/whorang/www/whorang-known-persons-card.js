@@ -1280,12 +1280,16 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     const baseUrls = this.getWhoRangBaseUrlCandidates();
     const avatarUrl = baseUrls.length > 0 ? `${baseUrls[0]}/api/faces/persons/${person.id}/avatar` : '';
     
+    console.log(`Person ${person.id} (${person.name}): avatar URL = ${avatarUrl}`);
+    console.log(`Person data:`, person);
+    
     return `
       <div class="person-management-item" data-person-id="${person.id}">
         <div class="person-info">
           <div class="person-avatar-small">
             <img src="${avatarUrl}" alt="${person.name}" 
-                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                 onerror="console.error('Avatar failed to load for person ${person.id}: ${avatarUrl}'); this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                 onload="console.log('Avatar loaded successfully for person ${person.id}: ${avatarUrl}');" />
             <div class="avatar-placeholder-small" style="display: none;">👤</div>
           </div>
           <div class="person-details-management">
@@ -1436,34 +1440,55 @@ class WhoRangKnownPersonsCard extends HTMLElement {
 
   async viewPersonFaces(personId) {
     try {
-      // Get person faces from backend
+      // Get person faces from backend - need to get actual detected faces, not just encodings
       const baseUrls = this.getWhoRangBaseUrlCandidates();
       let facesData = null;
       
       for (const baseUrl of baseUrls) {
         try {
-          const response = await fetch(`${baseUrl}/api/faces/persons/${personId}`);
-          if (response.ok) {
-            const data = await response.json();
-            // PersonController returns person object directly with encodings and recentEvents
-            if (data && data.id) {
-              // Extract faces from encodings or create face objects from recent events
-              facesData = data.encodings || data.faces || [];
+          // Try to get detected faces for this person directly
+          const facesResponse = await fetch(`${baseUrl}/api/detected-faces?person_id=${personId}`);
+          if (facesResponse.ok) {
+            const facesResult = await facesResponse.json();
+            if (facesResult && Array.isArray(facesResult.faces)) {
+              facesData = facesResult.faces.map(face => ({
+                id: face.id,
+                image_url: `${baseUrl}/api/faces/${face.id}/image`,
+                quality_score: face.quality_score || 0,
+                detection_date: face.created_at,
+                confidence: face.confidence || 0
+              }));
               break;
-            } else if (data.success) {
-              facesData = data.faces || data.data || [];
+            }
+          }
+          
+          // Fallback: try the person endpoint and extract encodings
+          const personResponse = await fetch(`${baseUrl}/api/faces/persons/${personId}`);
+          if (personResponse.ok) {
+            const personData = await personResponse.json();
+            if (personData && personData.id) {
+              // PersonController returns encodings, but we need to convert them to face objects
+              const encodings = personData.encodings || [];
+              facesData = encodings.map((encoding, index) => ({
+                id: encoding.id || `encoding_${index}`,
+                image_url: `${baseUrl}/api/faces/persons/${personId}/avatar`, // Use avatar as fallback
+                quality_score: 0.8, // Default quality
+                detection_date: encoding.created_at || new Date().toISOString(),
+                confidence: 0.9 // Default confidence
+              }));
               break;
             }
           }
         } catch (error) {
+          console.warn(`Failed to fetch faces from ${baseUrl}:`, error);
           continue;
         }
       }
       
-      if (facesData) {
+      if (facesData && facesData.length > 0) {
         this.showPersonFacesDialog(personId, facesData);
       } else {
-        this.showNotification('Failed to load person faces', 'error');
+        this.showNotification('No faces found for this person', 'info');
       }
     } catch (error) {
       console.error('Failed to view person faces:', error);
