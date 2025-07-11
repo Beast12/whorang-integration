@@ -940,14 +940,14 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       }
     }
     
-    // Try multiple avatar URL patterns
+    // Try multiple avatar URL patterns - prioritize the PersonController endpoint
     const baseUrls = this.getWhoRangBaseUrlCandidates();
     
     for (const baseUrl of baseUrls) {
-      // Try different avatar endpoint patterns
+      // Try different avatar endpoint patterns - PersonController endpoint first
       const avatarPatterns = [
-        `${baseUrl}/api/faces/persons/${person.id}/avatar`,  // Our new pattern
-        `${baseUrl}/api/persons/${person.id}/avatar`,        // Current backend pattern
+        `${baseUrl}/api/faces/persons/${person.id}/avatar`,  // PersonController pattern (primary)
+        `${baseUrl}/api/persons/${person.id}/avatar`,        // Legacy pattern
         `${baseUrl}/api/persons/${person.id}/image`,         // Alternative pattern
         `${baseUrl}/api/persons/${person.id}/thumbnail`      // Another alternative
       ];
@@ -956,11 +956,13 @@ class WhoRangKnownPersonsCard extends HTMLElement {
         if (await this.testImageUrl(avatarUrl)) {
           // Cache the working base URL for future use
           this._workingBaseUrl = baseUrl;
+          console.log(`Found working avatar URL for person ${person.id}: ${avatarUrl}`);
           return avatarUrl;
         }
       }
     }
     
+    console.warn(`No working avatar URL found for person ${person.id} (${person.name})`);
     return null; // No avatar available - will show placeholder
   }
 
@@ -1274,11 +1276,15 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     const lastSeenText = this.formatLastSeen(person.last_seen);
     const lastSeenClass = this.getLastSeenClass(person.last_seen);
     
+    // Generate avatar URL from the first working base URL
+    const baseUrls = this.getWhoRangBaseUrlCandidates();
+    const avatarUrl = baseUrls.length > 0 ? `${baseUrls[0]}/api/faces/persons/${person.id}/avatar` : '';
+    
     return `
       <div class="person-management-item" data-person-id="${person.id}">
         <div class="person-info">
           <div class="person-avatar-small">
-            <img src="${person.avatar_url || ''}" alt="${person.name}" 
+            <img src="${avatarUrl}" alt="${person.name}" 
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
             <div class="avatar-placeholder-small" style="display: none;">👤</div>
           </div>
