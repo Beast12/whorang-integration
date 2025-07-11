@@ -673,6 +673,105 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             except Exception as err:
                 _LOGGER.error("Error getting face similarities for %s: %s", face_id, err)
 
+    # Person Management Services
+
+    async def update_person_service(call) -> None:
+        """Handle update person service call."""
+        person_id = call.data.get("person_id")
+        name = call.data.get("name")
+        description = call.data.get("description")
+        
+        if not person_id:
+            _LOGGER.error("Person ID is required for updating person")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.api_client.update_person(person_id, {
+                    "name": name,
+                    "description": description
+                })
+                if success:
+                    _LOGGER.info("Successfully updated person %s", person_id)
+                    await coordinator.async_request_refresh()
+                else:
+                    _LOGGER.error("Failed to update person %s", person_id)
+                    
+            except Exception as err:
+                _LOGGER.error("Error updating person %s: %s", person_id, err)
+
+    async def get_person_details_service(call) -> None:
+        """Handle get person details service call."""
+        person_id = call.data.get("person_id")
+        
+        if not person_id:
+            _LOGGER.error("Person ID is required for getting person details")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                person_details = await coordinator.api_client.get_person_details(person_id)
+                if person_details:
+                    _LOGGER.info("Retrieved details for person %s: %s", person_id, person_details.get("name", "Unknown"))
+                    
+                    # Update coordinator data with person details
+                    if coordinator.data is None:
+                        coordinator.data = {}
+                    coordinator.data["person_details"] = {
+                        "person_id": person_id,
+                        "details": person_details,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    coordinator.async_set_updated_data(coordinator.data)
+                else:
+                    _LOGGER.error("Failed to get details for person %s", person_id)
+                    
+            except Exception as err:
+                _LOGGER.error("Error getting person details for %s: %s", person_id, err)
+
+    async def merge_persons_service(call) -> None:
+        """Handle merge persons service call."""
+        source_person_id = call.data.get("source_person_id")
+        target_person_id = call.data.get("target_person_id")
+        
+        if not source_person_id or not target_person_id:
+            _LOGGER.error("Both source and target person IDs are required for merging persons")
+            return
+            
+        if source_person_id == target_person_id:
+            _LOGGER.error("Source and target person IDs cannot be the same")
+            return
+            
+        # Get all coordinators
+        coordinators = [
+            coordinator for coordinator in hass.data[DOMAIN].values()
+            if isinstance(coordinator, WhoRangDataUpdateCoordinator)
+        ]
+        
+        for coordinator in coordinators:
+            try:
+                success = await coordinator.api_client.merge_persons(source_person_id, target_person_id)
+                if success:
+                    _LOGGER.info("Successfully merged person %s into person %s", source_person_id, target_person_id)
+                    await coordinator.async_request_refresh()
+                else:
+                    _LOGGER.error("Failed to merge person %s into person %s", source_person_id, target_person_id)
+                    
+            except Exception as err:
+                _LOGGER.error("Error merging persons %s -> %s: %s", source_person_id, target_person_id, err)
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -838,5 +937,36 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             vol.Required("face_id"): int,
             vol.Optional("threshold", default=0.6): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
             vol.Optional("limit", default=10): vol.All(int, vol.Range(min=1, max=50)),
+        }),
+    )
+
+    # Register person management services
+    hass.services.async_register(
+        DOMAIN,
+        "update_person",
+        update_person_service,
+        schema=vol.Schema({
+            vol.Required("person_id"): int,
+            vol.Optional("name"): str,
+            vol.Optional("description"): str,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "get_person_details",
+        get_person_details_service,
+        schema=vol.Schema({
+            vol.Required("person_id"): int,
+        }),
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "merge_persons",
+        merge_persons_service,
+        schema=vol.Schema({
+            vol.Required("source_person_id"): int,
+            vol.Required("target_person_id"): int,
         }),
     )

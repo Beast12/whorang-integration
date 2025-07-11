@@ -335,3 +335,75 @@ get_face_similarities:
           min: 1
           max: 50
           mode: box
+
+# Person Management Services
+
+update_person:
+  name: Update Person
+  description: Update person information (name and description)
+  fields:
+    person_id:
+      name: Person ID
+      description: ID of the person to update
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    name:
+      name: Name
+      description: New name for the person
+      required: false
+      example: "John Doe"
+      selector:
+        text:
+    description:
+      name: Description
+      description: New description for the person
+      required: false
+      example: "Family member"
+      selector:
+        text:
+          multiline: true
+
+get_person_details:
+  name: Get Person Details
+  description: Get detailed information about a person including associated faces
+  fields:
+    person_id:
+      name: Person ID
+      description: ID of the person to get details for
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+
+merge_persons:
+  name: Merge Persons
+  description: Merge two person entries into one
+  fields:
+    source_person_id:
+      name: Source Person ID
+      description: ID of the person to merge from (will be deleted)
+      required: true
+      example: 2
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box
+    target_person_id:
+      name: Target Person ID
+      description: ID of the person to merge into (will be kept)
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 10000
+          mode: box

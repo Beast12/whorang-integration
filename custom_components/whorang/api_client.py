@@ -848,17 +848,73 @@ class WhoRangAPIClient:
             return False
 
     async def get_face_similarities(self, face_id: int, threshold: float = 0.6, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get similar faces for labeling suggestions."""
+        """Get similar faces for a given face ID."""
         try:
-            params = {
+            response = await self._request("POST", "/api/faces/similarities", data={
+                "face_id": face_id,
                 "threshold": threshold,
                 "limit": limit
-            }
-            response = await self._request("GET", f"{API_DETECTED_FACES}/{face_id}/similarities", params=params)
-            return response.get("similarities", [])
-        except Exception as e:
-            _LOGGER.error("Failed to get face similarities for %s: %s", face_id, e)
+            })
+            return response.get("similar_faces", [])
+        except Exception as err:
+            _LOGGER.error("Failed to get face similarities: %s", err)
             return []
+
+    # Person Management Methods
+
+    async def update_person(self, person_id: int, data: Dict[str, Any]) -> bool:
+        """Update person information."""
+        try:
+            response = await self._request("PUT", f"/api/persons/{person_id}", data=data)
+            return response.get("success", False)
+        except Exception as err:
+            _LOGGER.error("Failed to update person %s: %s", person_id, err)
+            return False
+
+    async def get_person_details(self, person_id: int) -> Dict[str, Any]:
+        """Get detailed person information including faces."""
+        try:
+            response = await self._request("GET", f"/api/persons/{person_id}?include_faces=true")
+            if response.get("success"):
+                return response.get("person", {})
+            return {}
+        except Exception as err:
+            _LOGGER.error("Failed to get person details for %s: %s", person_id, err)
+            return {}
+
+    async def merge_persons(self, source_id: int, target_id: int) -> bool:
+        """Merge two person entries."""
+        try:
+            # This would need to be implemented in the backend
+            # For now, we'll simulate it by transferring faces and deleting the source
+            
+            # Get source person faces
+            source_details = await self.get_person_details(source_id)
+            source_faces = source_details.get("faces", [])
+            
+            # Get target person details
+            target_details = await self.get_person_details(target_id)
+            target_name = target_details.get("name", "Unknown")
+            
+            # Transfer each face from source to target
+            success_count = 0
+            for face in source_faces:
+                face_id = face.get("id")
+                if face_id:
+                    if await self.label_face_with_name(face_id, target_name):
+                        success_count += 1
+            
+            # If all faces transferred successfully, delete the source person
+            if success_count == len(source_faces) and success_count > 0:
+                # Delete source person (this would remove the person entry)
+                delete_response = await self._request("DELETE", f"/api/persons/{source_id}")
+                return delete_response.get("success", False)
+            
+            return success_count > 0
+            
+        except Exception as err:
+            _LOGGER.error("Failed to merge persons %s -> %s: %s", source_id, target_id, err)
+            return False
 
     async def delete_face(self, face_id: int) -> bool:
         """Delete a detected face."""

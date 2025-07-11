@@ -362,6 +362,425 @@ class WhoRangKnownPersonsCard extends HTMLElement {
         .confidence-low {
           background: rgba(244, 67, 54, 0.8);
         }
+        
+        /* Person Management Modal Styles */
+        .person-management-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 10000;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          font-family: var(--paper-font-body1_-_font-family);
+        }
+        
+        .modal-backdrop {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(2px);
+        }
+        
+        .modal-content {
+          background: var(--card-background-color, #fff);
+          border-radius: 12px;
+          max-width: 900px;
+          width: 90%;
+          max-height: 80vh;
+          position: relative;
+          z-index: 10001;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px 24px;
+          border-bottom: 1px solid var(--divider-color, #e0e0e0);
+          flex-shrink: 0;
+        }
+        
+        .modal-header h2 {
+          margin: 0;
+          font-size: 1.4em;
+          font-weight: 500;
+          color: var(--primary-text-color, #212121);
+        }
+        
+        .close-btn {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: var(--secondary-text-color, #757575);
+          padding: 4px;
+          border-radius: 50%;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+        
+        .close-btn:hover {
+          background: var(--secondary-background-color, #f5f5f5);
+          color: var(--primary-text-color, #212121);
+        }
+        
+        .modal-body {
+          padding: 24px;
+          overflow-y: auto;
+          flex: 1;
+        }
+        
+        .person-management-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+        
+        .add-person-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          background: var(--primary-color, #03a9f4);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 0.9em;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+        
+        .add-person-btn:hover {
+          background: var(--primary-color, #03a9f4)dd;
+          transform: translateY(-1px);
+        }
+        
+        .person-count {
+          font-size: 0.9em;
+          color: var(--secondary-text-color, #757575);
+        }
+        
+        .persons-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+        
+        .person-management-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color, #e0e0e0);
+          border-radius: 12px;
+          transition: all 0.2s ease;
+        }
+        
+        .person-management-item:hover {
+          border-color: var(--primary-color, #03a9f4);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .person-info {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex: 1;
+        }
+        
+        .person-avatar-small {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          overflow: hidden;
+          background: var(--secondary-background-color, #f5f5f5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        
+        .person-avatar-small img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .avatar-placeholder-small {
+          font-size: 24px;
+          color: var(--secondary-text-color, #757575);
+        }
+        
+        .person-details-management {
+          flex: 1;
+        }
+        
+        .person-name-editable {
+          font-size: 1.1em;
+          font-weight: 500;
+          color: var(--primary-text-color, #212121);
+          margin-bottom: 4px;
+        }
+        
+        .person-stats {
+          font-size: 0.85em;
+          color: var(--secondary-text-color, #757575);
+          margin-bottom: 4px;
+        }
+        
+        .person-description-editable {
+          font-size: 0.9em;
+          color: var(--secondary-text-color, #757575);
+          font-style: italic;
+        }
+        
+        .person-actions {
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        
+        .action-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 6px 12px;
+          border: 1px solid var(--divider-color, #e0e0e0);
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color, #212121);
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.8em;
+          transition: all 0.2s ease;
+        }
+        
+        .action-btn:hover {
+          border-color: var(--primary-color, #03a9f4);
+          color: var(--primary-color, #03a9f4);
+        }
+        
+        .action-btn.delete-btn:hover {
+          border-color: var(--error-color, #f44336);
+          color: var(--error-color, #f44336);
+        }
+        
+        .action-btn .icon {
+          font-size: 14px;
+        }
+        
+        .empty-management-state {
+          text-align: center;
+          padding: 40px 20px;
+          color: var(--secondary-text-color, #757575);
+        }
+        
+        .empty-management-state .icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+          opacity: 0.5;
+        }
+        
+        .error-management-state {
+          text-align: center;
+          padding: 40px 20px;
+          color: var(--error-color, #f44336);
+          background: var(--error-color, #f44336)10;
+          border-radius: 8px;
+        }
+        
+        .error-management-state .icon {
+          font-size: 48px;
+          margin-bottom: 16px;
+        }
+        
+        .retry-btn {
+          margin-top: 16px;
+          padding: 8px 16px;
+          background: var(--primary-color, #03a9f4);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.9em;
+        }
+        
+        .retry-btn:hover {
+          background: var(--primary-color, #03a9f4)dd;
+        }
+        
+        /* Faces Dialog Styles */
+        .faces-dialog {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 10002;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .faces-dialog-backdrop {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.7);
+        }
+        
+        .faces-dialog-content {
+          background: var(--card-background-color, #fff);
+          border-radius: 12px;
+          max-width: 800px;
+          width: 90%;
+          max-height: 70vh;
+          position: relative;
+          z-index: 10003;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .faces-dialog-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--divider-color, #e0e0e0);
+        }
+        
+        .faces-dialog-header h3 {
+          margin: 0;
+          font-size: 1.2em;
+          color: var(--primary-text-color, #212121);
+        }
+        
+        .close-faces-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          color: var(--secondary-text-color, #757575);
+          padding: 4px;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .close-faces-btn:hover {
+          background: var(--secondary-background-color, #f5f5f5);
+        }
+        
+        .faces-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 16px;
+          padding: 20px;
+          overflow-y: auto;
+        }
+        
+        .face-item {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+        
+        .face-thumbnail {
+          width: 100px;
+          height: 100px;
+          object-fit: cover;
+          border-radius: 8px;
+          border: 2px solid var(--divider-color, #e0e0e0);
+          margin-bottom: 8px;
+        }
+        
+        .face-info {
+          font-size: 0.8em;
+          color: var(--secondary-text-color, #757575);
+        }
+        
+        /* Notification Styles */
+        .notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 12px 16px;
+          border-radius: 8px;
+          color: white;
+          font-size: 0.9em;
+          z-index: 10004;
+          animation: slideIn 0.3s ease;
+        }
+        
+        .notification-success {
+          background: var(--success-color, #4caf50);
+        }
+        
+        .notification-error {
+          background: var(--error-color, #f44336);
+        }
+        
+        .notification-info {
+          background: var(--primary-color, #03a9f4);
+        }
+        
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+          .modal-content {
+            width: 95%;
+            max-height: 90vh;
+          }
+          
+          .person-management-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          
+          .person-actions {
+            width: 100%;
+            justify-content: flex-end;
+          }
+          
+          .faces-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            padding: 16px;
+          }
+        }
       </style>
       
       <div class="known-persons">
@@ -390,6 +809,22 @@ class WhoRangKnownPersonsCard extends HTMLElement {
         <div class="controls" id="controls" style="display: none;">
           <button class="control-btn" id="refresh-btn">Refresh Gallery</button>
           <button class="control-btn" id="manage-btn">Manage Persons</button>
+        </div>
+      </div>
+      
+      <!-- Person Management Modal -->
+      <div class="person-management-modal" id="person-modal">
+        <div class="modal-backdrop" id="modal-backdrop"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Manage Known Persons</h2>
+            <button class="close-btn" id="close-modal-btn">&times;</button>
+          </div>
+          <div class="modal-body" id="modal-body">
+            <div class="loading-state">
+              <div>Loading person management data...</div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -698,6 +1133,28 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     if (manageBtn) {
       manageBtn.addEventListener('click', () => this.openPersonManagement());
     }
+
+    // Modal event listeners
+    const closeModalBtn = this.shadowRoot.getElementById('close-modal-btn');
+    const modalBackdrop = this.shadowRoot.getElementById('modal-backdrop');
+
+    if (closeModalBtn) {
+      closeModalBtn.addEventListener('click', () => this.closePersonManagement());
+    }
+
+    if (modalBackdrop) {
+      modalBackdrop.addEventListener('click', () => this.closePersonManagement());
+    }
+
+    // Keyboard event listener for ESC key
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        const modal = this.shadowRoot.getElementById('person-modal');
+        if (modal && modal.style.display === 'flex') {
+          this.closePersonManagement();
+        }
+      }
+    });
   }
 
   refreshGallery() {
@@ -724,15 +1181,379 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     }
   }
 
-  openPersonManagement() {
-    // This could open a dialog or navigate to a person management page
-    console.log('Open person management');
+  async openPersonManagement() {
+    console.log('Opening person management modal');
+    
+    // Show the modal
+    const modal = this.shadowRoot.getElementById('person-modal');
+    if (modal) {
+      modal.style.display = 'flex';
+      
+      // Load fresh person data
+      await this.loadPersonManagementData();
+    }
     
     // Fire custom event for person management
     this.dispatchEvent(new CustomEvent('person-management-requested', {
       bubbles: true,
       composed: true
     }));
+  }
+
+  async loadPersonManagementData() {
+    if (!this._hass) return;
+    
+    try {
+      // Get detailed person data from the backend
+      const baseUrls = this.getWhoRangBaseUrlCandidates();
+      let personsData = null;
+      
+      for (const baseUrl of baseUrls) {
+        try {
+          const response = await fetch(`${baseUrl}/api/persons?include_faces=true&include_stats=true`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              personsData = data.persons || [];
+              break;
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch from ${baseUrl}:`, error);
+          continue;
+        }
+      }
+      
+      if (personsData) {
+        this.renderPersonManagementModal(personsData);
+      } else {
+        console.error('Failed to load person management data from all URLs');
+        this.renderPersonManagementError();
+      }
+    } catch (error) {
+      console.error('Error loading person management data:', error);
+      this.renderPersonManagementError();
+    }
+  }
+
+  renderPersonManagementModal(persons) {
+    const modalBody = this.shadowRoot.getElementById('modal-body');
+    if (!modalBody) return;
+    
+    modalBody.innerHTML = `
+      <div class="person-management-header">
+        <button class="add-person-btn" id="add-person-btn">
+          <span class="icon">➕</span>
+          Add New Person
+        </button>
+        <div class="person-count">${persons.length} known persons</div>
+      </div>
+      
+      <div class="persons-list" id="persons-list">
+        ${persons.map(person => this.renderPersonManagementItem(person)).join('')}
+      </div>
+      
+      ${persons.length === 0 ? `
+        <div class="empty-management-state">
+          <div class="icon">👥</div>
+          <div>No known persons yet</div>
+          <div style="margin-top: 8px; font-size: 0.9em;">Add persons manually or label faces to get started.</div>
+        </div>
+      ` : ''}
+    `;
+    
+    // Set up event listeners for the modal content
+    this.setupPersonManagementListeners();
+  }
+
+  renderPersonManagementItem(person) {
+    const lastSeenText = this.formatLastSeen(person.last_seen);
+    const lastSeenClass = this.getLastSeenClass(person.last_seen);
+    
+    return `
+      <div class="person-management-item" data-person-id="${person.id}">
+        <div class="person-info">
+          <div class="person-avatar-small">
+            <img src="${person.avatar_url || ''}" alt="${person.name}" 
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+            <div class="avatar-placeholder-small" style="display: none;">👤</div>
+          </div>
+          <div class="person-details-management">
+            <div class="person-name-editable" data-field="name">${person.name}</div>
+            <div class="person-stats">
+              ${person.face_count || 0} faces • Last seen: <span class="last-seen ${lastSeenClass}">${lastSeenText}</span>
+            </div>
+            <div class="person-description-editable" data-field="description">
+              ${person.description || 'No description'}
+            </div>
+          </div>
+        </div>
+        <div class="person-actions">
+          <button class="action-btn edit-btn" data-action="edit" data-person-id="${person.id}">
+            <span class="icon">✏️</span>
+            Edit
+          </button>
+          <button class="action-btn faces-btn" data-action="faces" data-person-id="${person.id}">
+            <span class="icon">👁️</span>
+            View Faces
+          </button>
+          <button class="action-btn delete-btn" data-action="delete" data-person-id="${person.id}">
+            <span class="icon">🗑️</span>
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderPersonManagementError() {
+    const modalBody = this.shadowRoot.getElementById('modal-body');
+    if (!modalBody) return;
+    
+    modalBody.innerHTML = `
+      <div class="error-management-state">
+        <div class="icon">⚠️</div>
+        <div>Failed to load person management data</div>
+        <div style="margin-top: 8px; font-size: 0.9em;">Please check your WhoRang backend connection.</div>
+        <button class="retry-btn" id="retry-load-btn">Retry</button>
+      </div>
+    `;
+    
+    const retryBtn = modalBody.querySelector('#retry-load-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => this.loadPersonManagementData());
+    }
+  }
+
+  setupPersonManagementListeners() {
+    const modalBody = this.shadowRoot.getElementById('modal-body');
+    if (!modalBody) return;
+    
+    // Add person button
+    const addPersonBtn = modalBody.querySelector('#add-person-btn');
+    if (addPersonBtn) {
+      addPersonBtn.addEventListener('click', () => this.showAddPersonDialog());
+    }
+    
+    // Action buttons
+    modalBody.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      
+      const action = target.dataset.action;
+      const personId = parseInt(target.dataset.personId);
+      
+      switch (action) {
+        case 'edit':
+          this.editPerson(personId);
+          break;
+        case 'faces':
+          this.viewPersonFaces(personId);
+          break;
+        case 'delete':
+          this.deletePerson(personId);
+          break;
+      }
+    });
+    
+    // Editable fields
+    modalBody.addEventListener('dblclick', (event) => {
+      const editableField = event.target.closest('[data-field]');
+      if (editableField) {
+        this.makeFieldEditable(editableField);
+      }
+    });
+  }
+
+  async showAddPersonDialog() {
+    const name = prompt('Enter person name:');
+    if (!name || !name.trim()) return;
+    
+    const description = prompt('Enter description (optional):') || '';
+    
+    try {
+      await this._hass.callService('whorang', 'add_known_visitor', {
+        name: name.trim(),
+        notes: description.trim()
+      });
+      
+      // Reload the modal data
+      await this.loadPersonManagementData();
+      
+      // Show success message
+      this.showNotification('Person added successfully', 'success');
+    } catch (error) {
+      console.error('Failed to add person:', error);
+      this.showNotification('Failed to add person', 'error');
+    }
+  }
+
+  async editPerson(personId) {
+    const personItem = this.shadowRoot.querySelector(`[data-person-id="${personId}"]`);
+    if (!personItem) return;
+    
+    const nameElement = personItem.querySelector('[data-field="name"]');
+    const descriptionElement = personItem.querySelector('[data-field="description"]');
+    
+    const currentName = nameElement.textContent;
+    const currentDescription = descriptionElement.textContent === 'No description' ? '' : descriptionElement.textContent;
+    
+    const newName = prompt('Edit person name:', currentName);
+    if (newName === null) return; // User cancelled
+    
+    const newDescription = prompt('Edit description:', currentDescription);
+    if (newDescription === null) return; // User cancelled
+    
+    try {
+      // Call the update person service (we'll need to add this)
+      await this._hass.callService('whorang', 'update_person', {
+        person_id: personId,
+        name: newName.trim(),
+        description: newDescription.trim()
+      });
+      
+      // Update the UI immediately
+      nameElement.textContent = newName.trim();
+      descriptionElement.textContent = newDescription.trim() || 'No description';
+      
+      // Show success message
+      this.showNotification('Person updated successfully', 'success');
+    } catch (error) {
+      console.error('Failed to update person:', error);
+      this.showNotification('Failed to update person', 'error');
+    }
+  }
+
+  async viewPersonFaces(personId) {
+    try {
+      // Get person faces from backend
+      const baseUrls = this.getWhoRangBaseUrlCandidates();
+      let facesData = null;
+      
+      for (const baseUrl of baseUrls) {
+        try {
+          const response = await fetch(`${baseUrl}/api/persons/${personId}?include_faces=true`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              facesData = data.faces || [];
+              break;
+            }
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+      
+      if (facesData) {
+        this.showPersonFacesDialog(personId, facesData);
+      } else {
+        this.showNotification('Failed to load person faces', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to view person faces:', error);
+      this.showNotification('Failed to load person faces', 'error');
+    }
+  }
+
+  showPersonFacesDialog(personId, faces) {
+    // Create a simple faces viewer dialog
+    const facesHtml = faces.map(face => `
+      <div class="face-item">
+        <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" />
+        <div class="face-info">
+          <div>Quality: ${Math.round((face.quality_score || 0) * 100)}%</div>
+          <div>Detected: ${new Date(face.detection_date).toLocaleDateString()}</div>
+        </div>
+      </div>
+    `).join('');
+    
+    const dialog = document.createElement('div');
+    dialog.className = 'faces-dialog';
+    dialog.innerHTML = `
+      <div class="faces-dialog-backdrop"></div>
+      <div class="faces-dialog-content">
+        <div class="faces-dialog-header">
+          <h3>Person Faces (${faces.length})</h3>
+          <button class="close-faces-btn">&times;</button>
+        </div>
+        <div class="faces-grid">
+          ${facesHtml}
+        </div>
+      </div>
+    `;
+    
+    this.shadowRoot.appendChild(dialog);
+    
+    // Close dialog listeners
+    const closeBtn = dialog.querySelector('.close-faces-btn');
+    const backdrop = dialog.querySelector('.faces-dialog-backdrop');
+    
+    const closeDialog = () => {
+      dialog.remove();
+    };
+    
+    closeBtn.addEventListener('click', closeDialog);
+    backdrop.addEventListener('click', closeDialog);
+  }
+
+  async deletePerson(personId) {
+    const personItem = this.shadowRoot.querySelector(`[data-person-id="${personId}"]`);
+    if (!personItem) return;
+    
+    const personName = personItem.querySelector('[data-field="name"]').textContent;
+    
+    if (!confirm(`Are you sure you want to delete "${personName}"? This will remove all associated face data.`)) {
+      return;
+    }
+    
+    try {
+      await this._hass.callService('whorang', 'remove_known_visitor', {
+        person_id: personId
+      });
+      
+      // Remove from UI immediately
+      personItem.remove();
+      
+      // Update person count
+      const countElement = this.shadowRoot.getElementById('modal-body').querySelector('.person-count');
+      if (countElement) {
+        const currentCount = parseInt(countElement.textContent);
+        countElement.textContent = `${currentCount - 1} known persons`;
+      }
+      
+      // Show success message
+      this.showNotification('Person deleted successfully', 'success');
+      
+      // Refresh the main card data
+      this.refreshGallery();
+    } catch (error) {
+      console.error('Failed to delete person:', error);
+      this.showNotification('Failed to delete person', 'error');
+    }
+  }
+
+  showNotification(message, type = 'info') {
+    // Create a simple notification
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    this.shadowRoot.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 3000);
+  }
+
+  closePersonManagement() {
+    const modal = this.shadowRoot.getElementById('person-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
   }
 
   getCardSize() {
