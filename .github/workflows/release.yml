@@ -79,7 +79,8 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           
           # Extract changelog section for this version
-          CHANGELOG_CONTENT=$(awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md || echo "See CHANGELOG.md for details.")
+          CHANGELOG_CONTENT=$(awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" \
+            CHANGELOG.md || echo "See CHANGELOG.md for details.")
           
           # Save to file for multiline output
           echo "$CHANGELOG_CONTENT" > changelog_excerpt.md
