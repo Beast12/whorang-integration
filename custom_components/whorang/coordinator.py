@@ -666,13 +666,19 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
         if hasattr(self, 'data') and self.data:
             # Update latest visitor with analysis results
             if "latest_visitor" in self.data:
+                ai_response = analysis_data.get("analysis", "Analysis completed")
+                
                 self.data["latest_visitor"].update({
-                    "ai_analysis": analysis_data.get("analysis"),
+                    "ai_analysis": ai_response,
+                    "ai_message": ai_response,  # This is what the sensor reads!
                     "confidence": analysis_data.get("confidence", 0),
                     "faces_detected": analysis_data.get("faces_detected", 0),
                     "analysis_provider": analysis_data.get("provider", "unknown"),
-                    "analysis_timestamp": analysis_data.get("timestamp")
+                    "analysis_timestamp": analysis_data.get("timestamp"),
+                    "processing": False  # Analysis is complete
                 })
+                
+                _LOGGER.info("Updated sensor with AI response: %s", ai_response[:100] + "..." if len(ai_response) > 100 else ai_response)
             
             # Set AI processing to false
             self.data["ai_processing"] = False
@@ -874,17 +880,19 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 "pressure": event_data.get("pressure", 1013)
             }
             
-            # Create visitor data structure
+            # Create visitor data structure with initial processing message
             visitor_data = {
                 "visitor_id": f"service_call_{int(current_time.timestamp())}",
                 "visitor_name": "Unknown Visitor",
                 "timestamp": event_data.get("timestamp", current_time.isoformat()),
                 "face_recognized": False,
                 "confidence": 0.8,
-                "ai_analysis": event_data.get("ai_message", "Visitor detected"),
+                "ai_analysis": "🔄 AI analysis in progress...",  # Initial processing message
+                "ai_message": "🔄 AI analysis in progress...",     # For compatibility
                 "ai_title": event_data.get("ai_title", "Doorbell Event"),
                 "image_url": image_url,
                 "location": event_data.get("location", "front_door"),
+                "processing": True,  # Flag to indicate analysis is in progress
                 
                 # Store weather as both dict and individual fields for flexibility
                 "weather": weather_data,
@@ -954,9 +962,61 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 "image_url": image_url
             })
             
+            # Schedule a delayed update to fetch the actual AI response from backend
+            # This ensures we get the AI response even if WebSocket doesn't work
+            asyncio.create_task(self._delayed_ai_response_fetch(visitor_data["visitor_id"]))
+            
             _LOGGER.info("Successfully processed doorbell event with image: %s", image_url)
             return True
             
         except Exception as err:
             _LOGGER.error("Failed to process doorbell event in coordinator: %s", err, exc_info=True)
             return False
+
+    async def _delayed_ai_response_fetch(self, visitor_id: str) -> None:
+        """Fetch the actual AI response from backend after a delay to ensure analysis is complete."""
+        try:
+            # Wait for backend to complete AI analysis (typically takes 3-10 seconds)
+            await asyncio.sleep(15)  # Give enough time for AI analysis to complete
+            
+            _LOGGER.info("Fetching updated visitor data for AI response: %s", visitor_id)
+            
+            # Fetch the latest visitor data from backend
+            latest_visitor = await self.api_client.get_latest_visitor()
+            
+            if latest_visitor and hasattr(self, 'data') and self.data:
+                # Check if this is the visitor we're looking for or if it's newer
+                backend_visitor_id = latest_visitor.get("visitor_id")
+                backend_timestamp = latest_visitor.get("timestamp")
+                
+                # Update the sensor with the actual AI response from backend
+                ai_message = latest_visitor.get("ai_message", "")
+                ai_title = latest_visitor.get("ai_title", "")
+                
+                if ai_message and ai_message != "🔄 AI analysis in progress...":
+                    # Update coordinator data with the actual AI response
+                    self.data["latest_visitor"].update({
+                        "ai_analysis": ai_message,
+                        "ai_message": ai_message,
+                        "ai_title": ai_title,
+                        "processing": False,
+                        "backend_visitor_id": backend_visitor_id,
+                        "backend_timestamp": backend_timestamp,
+                        "confidence": latest_visitor.get("confidence_score", 0),
+                        "faces_detected": latest_visitor.get("faces_detected", 0),
+                        "objects_detected": latest_visitor.get("objects_detected", 0),
+                        "analysis_provider": latest_visitor.get("ai_provider", "unknown")
+                    })
+                    
+                    # Trigger coordinator update to refresh all entities
+                    self.async_set_updated_data(self.data)
+                    
+                    _LOGGER.info("Successfully updated sensor with AI response from backend: %s", 
+                               ai_message[:100] + "..." if len(ai_message) > 100 else ai_message)
+                else:
+                    _LOGGER.warning("Backend AI response not ready yet or still processing")
+            else:
+                _LOGGER.warning("Failed to fetch updated visitor data from backend")
+                
+        except Exception as err:
+            _LOGGER.error("Error fetching delayed AI response: %s", err)
