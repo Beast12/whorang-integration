@@ -1210,11 +1210,15 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       
       for (const baseUrl of baseUrls) {
         try {
-          const response = await fetch(`${baseUrl}/api/persons?include_faces=true&include_stats=true`);
+          const response = await fetch(`${baseUrl}/api/faces/persons`);
           if (response.ok) {
             const data = await response.json();
-            if (data.success) {
-              personsData = data.persons || [];
+            // PersonController returns array directly, not wrapped in success object
+            if (Array.isArray(data)) {
+              personsData = data;
+              break;
+            } else if (data.success) {
+              personsData = data.persons || data.data || [];
               break;
             }
           }
@@ -1432,11 +1436,16 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       
       for (const baseUrl of baseUrls) {
         try {
-          const response = await fetch(`${baseUrl}/api/persons/${personId}?include_faces=true`);
+          const response = await fetch(`${baseUrl}/api/faces/persons/${personId}`);
           if (response.ok) {
             const data = await response.json();
-            if (data.success) {
-              facesData = data.faces || [];
+            // PersonController returns person object directly with encodings and recentEvents
+            if (data && data.id) {
+              // Extract faces from encodings or create face objects from recent events
+              facesData = data.encodings || data.faces || [];
+              break;
+            } else if (data.success) {
+              facesData = data.faces || data.data || [];
               break;
             }
           }

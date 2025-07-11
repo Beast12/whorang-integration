@@ -266,14 +266,14 @@ class WhoRangAPIClient:
             response = await self._request("GET", API_FACES_PERSONS)
             
             # Handle different response formats
-            if isinstance(response, dict):
+            if isinstance(response, list):
+                # Direct list format (what PersonController returns)
+                return response
+            elif isinstance(response, dict):
                 # Format: {"data": [...]} or {"persons": [...]} or {"known_persons": [...]}
                 return (response.get("data") or 
                        response.get("persons") or 
                        response.get("known_persons") or [])
-            elif isinstance(response, list):
-                # Direct list format
-                return response
             else:
                 _LOGGER.warning("Unexpected known persons response format: %s", type(response))
                 return []
@@ -865,8 +865,9 @@ class WhoRangAPIClient:
     async def update_person(self, person_id: int, data: Dict[str, Any]) -> bool:
         """Update person information."""
         try:
-            response = await self._request("PUT", f"/api/persons/{person_id}", data=data)
-            return response.get("success", False)
+            response = await self._request("PUT", f"/api/faces/persons/{person_id}", data=data)
+            # PersonController returns the updated person object directly, not wrapped in success
+            return isinstance(response, dict) and "id" in response
         except Exception as err:
             _LOGGER.error("Failed to update person %s: %s", person_id, err)
             return False
@@ -874,9 +875,10 @@ class WhoRangAPIClient:
     async def get_person_details(self, person_id: int) -> Dict[str, Any]:
         """Get detailed person information including faces."""
         try:
-            response = await self._request("GET", f"/api/persons/{person_id}?include_faces=true")
-            if response.get("success"):
-                return response.get("person", {})
+            response = await self._request("GET", f"/api/faces/persons/{person_id}")
+            # PersonController returns the person object directly with encodings and recentEvents
+            if isinstance(response, dict) and "id" in response:
+                return response
             return {}
         except Exception as err:
             _LOGGER.error("Failed to get person details for %s: %s", person_id, err)
