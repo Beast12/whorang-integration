@@ -368,7 +368,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 _LOGGER.error("Failed to test Ollama connection: %s", err)
 
     async def process_doorbell_event_service(call) -> None:
-        """Handle process doorbell event service call."""
+        """Handle process doorbell event service call with intelligent automation settings."""
         _LOGGER.info("=== DOORBELL EVENT SERVICE CALLED ===")
         _LOGGER.info("Service call data: %s", call.data)
         
@@ -407,6 +407,42 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             try:
                 _LOGGER.info("Processing doorbell event through coordinator")
                 
+                # Get intelligent automation configuration from config entry
+                config_entry = None
+                for entry_id, coord in coordinators_data.items():
+                    if coord == coordinator:
+                        # Find the config entry for this coordinator
+                        for entry in hass.config_entries.async_entries(DOMAIN):
+                            if entry.entry_id == entry_id:
+                                config_entry = entry
+                                break
+                        break
+                
+                automation_config = {}
+                if config_entry:
+                    automation_config = config_entry.options.get("intelligent_automation", {})
+                    _LOGGER.info("Using intelligent automation config: %s", automation_config)
+                
+                # Apply AI prompt template if configured and no AI message provided
+                if not ai_message and automation_config.get("ai_prompt_template"):
+                    from .const import AI_PROMPT_TEMPLATES
+                    
+                    template_name = automation_config.get("ai_prompt_template", "professional")
+                    custom_prompt = automation_config.get("custom_ai_prompt", "")
+                    
+                    if template_name == "custom" and custom_prompt:
+                        ai_prompt = custom_prompt
+                    else:
+                        template_config = AI_PROMPT_TEMPLATES.get(template_name, AI_PROMPT_TEMPLATES["professional"])
+                        ai_prompt = template_config["prompt"]
+                    
+                    # Add weather context if enabled
+                    if automation_config.get("enable_weather_context", True):
+                        weather_info = f"\n\nCurrent weather: {weather_condition}, {weather_temp}°C"
+                        ai_prompt += weather_info
+                    
+                    _LOGGER.info("Using AI prompt template '%s' for analysis", template_name)
+                
                 # Create comprehensive event data
                 event_data = {
                     "image_url": image_url,
@@ -419,7 +455,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     "wind_speed": wind_speed,
                     "pressure": pressure,
                     "timestamp": datetime.now().isoformat(),
-                    "source": "service_call"
+                    "source": "service_call",
+                    "automation_config": automation_config  # Pass config to coordinator
                 }
                 
                 # Process through coordinator
@@ -445,8 +482,19 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                             "pressure": pressure
                         },
                         "timestamp": event_data["timestamp"],
-                        "source": "service_call"
+                        "source": "service_call",
+                        "automation_config": automation_config
                     })
+                    
+                    # Handle intelligent notifications if configured
+                    await _handle_intelligent_notifications(
+                        hass, automation_config, image_url, ai_message or ai_title
+                    )
+                    
+                    # Handle media playback if configured
+                    await _handle_intelligent_media(
+                        hass, automation_config, image_url, ai_message or ai_title
+                    )
                     
                 else:
                     _LOGGER.error("Failed to process doorbell event with image: %s", image_url)
@@ -455,6 +503,59 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 _LOGGER.error("Error processing doorbell event: %s", err, exc_info=True)
         
         _LOGGER.info("=== DOORBELL EVENT SERVICE COMPLETED ===")
+
+    async def _handle_intelligent_notifications(
+        hass: HomeAssistant, 
+        automation_config: Dict[str, Any], 
+        image_url: str, 
+        message: str
+    ) -> None:
+        """Handle intelligent notifications based on configuration."""
+        try:
+            notification_template = automation_config.get("notification_template", "rich_media")
+            custom_template = automation_config.get("custom_notification_template", "")
+            
+            if notification_template == "custom" and custom_template:
+                # Use custom notification template
+                _LOGGER.info("Using custom notification template")
+                # Custom template handling would go here
+            else:
+                # Use built-in template
+                from .const import NOTIFICATION_TEMPLATES
+                template_config = NOTIFICATION_TEMPLATES.get(notification_template, NOTIFICATION_TEMPLATES["rich_media"])
+                _LOGGER.info("Using notification template: %s", notification_template)
+            
+            # Note: Actual notification sending would be handled by user's automation
+            # This is just configuration preparation
+            
+        except Exception as err:
+            _LOGGER.error("Error handling intelligent notifications: %s", err)
+
+    async def _handle_intelligent_media(
+        hass: HomeAssistant, 
+        automation_config: Dict[str, Any], 
+        image_url: str, 
+        message: str
+    ) -> None:
+        """Handle intelligent media playback based on configuration."""
+        try:
+            enable_tts = automation_config.get("enable_tts", False)
+            tts_service = automation_config.get("tts_service", "")
+            doorbell_sound = automation_config.get("doorbell_sound_file", "/local/sounds/doorbell.mp3")
+            
+            if enable_tts and tts_service and message:
+                _LOGGER.info("TTS enabled with service: %s", tts_service)
+                # TTS handling would be done by user's automation using the config
+            
+            if doorbell_sound:
+                _LOGGER.info("Doorbell sound configured: %s", doorbell_sound)
+                # Sound playback would be done by user's automation using the config
+            
+            # Note: Actual media playback would be handled by user's automation
+            # This is just configuration preparation
+            
+        except Exception as err:
+            _LOGGER.error("Error handling intelligent media: %s", err)
 
     # Face Management Services
 

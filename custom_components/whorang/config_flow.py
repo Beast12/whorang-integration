@@ -460,11 +460,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     "enabled": bool(ollama_host and ollama_host.strip())
                 }
                 
+                # Collect intelligent automation settings
+                intelligent_automation = {
+                    "ai_prompt_template": user_input.get("ai_prompt_template", "professional"),
+                    "custom_ai_prompt": user_input.get("custom_ai_prompt", ""),
+                    "enable_weather_context": user_input.get("enable_weather_context", True),
+                    "notification_template": user_input.get("notification_template", "rich_media"),
+                    "custom_notification_template": user_input.get("custom_notification_template", ""),
+                    "doorbell_sound_file": user_input.get("doorbell_sound_file", "/local/sounds/doorbell.mp3"),
+                    "enable_tts": user_input.get("enable_tts", False),
+                    "tts_service": user_input.get("tts_service", ""),
+                }
+                
                 # Update general options
                 new_options = {
                     CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
                     CONF_ENABLE_WEBSOCKET: user_input.get(CONF_ENABLE_WEBSOCKET, True),
                     CONF_ENABLE_COST_TRACKING: user_input.get(CONF_ENABLE_COST_TRACKING, True),
+                    "intelligent_automation": intelligent_automation,
                 }
                 
                 # Update config entry
@@ -485,6 +498,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         current_keys = self.config_entry.data.get("ai_api_keys", {})
         current_ollama = self.config_entry.data.get("ollama_config", {})
         current_options = self.config_entry.options
+        
+        # Get current intelligent automation settings
+        current_automation = self.config_entry.options.get("intelligent_automation", {})
+        
+        # Auto-discover TTS services
+        tts_services = [entity_id for entity_id in self.hass.states.async_entity_ids("tts")]
+        tts_options = [""] + tts_services  # Empty option for "none"
+        
+        # Auto-discover media players
+        media_players = [entity_id for entity_id in self.hass.states.async_entity_ids("media_player")]
         
         # Create comprehensive configuration schema
         data_schema = vol.Schema({
@@ -515,6 +538,40 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_OLLAMA_PORT,
                 default=current_ollama.get("port", DEFAULT_OLLAMA_PORT)
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
+            
+            # Intelligent Automation Configuration Section
+            vol.Optional(
+                "ai_prompt_template",
+                default=current_automation.get("ai_prompt_template", "professional")
+            ): vol.In(["professional", "friendly", "sarcastic", "detailed", "custom"]),
+            vol.Optional(
+                "custom_ai_prompt",
+                default=current_automation.get("custom_ai_prompt", "")
+            ): str,
+            vol.Optional(
+                "enable_weather_context",
+                default=current_automation.get("enable_weather_context", True)
+            ): bool,
+            vol.Optional(
+                "notification_template",
+                default=current_automation.get("notification_template", "rich_media")
+            ): vol.In(["rich_media", "simple", "custom"]),
+            vol.Optional(
+                "custom_notification_template",
+                default=current_automation.get("custom_notification_template", "")
+            ): str,
+            vol.Optional(
+                "doorbell_sound_file",
+                default=current_automation.get("doorbell_sound_file", "/local/sounds/doorbell.mp3")
+            ): str,
+            vol.Optional(
+                "enable_tts",
+                default=current_automation.get("enable_tts", False)
+            ): bool,
+            vol.Optional(
+                "tts_service",
+                default=current_automation.get("tts_service", "")
+            ): vol.In(tts_options) if tts_options else str,
             
             # General Options Section
             vol.Optional(
