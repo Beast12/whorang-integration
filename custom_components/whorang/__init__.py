@@ -423,25 +423,19 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     automation_config = config_entry.options.get("intelligent_automation", {})
                     _LOGGER.info("Using intelligent automation config: %s", automation_config)
                 
-                # Apply AI prompt template if configured and no AI message provided
-                if not ai_message and automation_config.get("ai_prompt_template"):
-                    from .const import AI_PROMPT_TEMPLATES
-                    
+                # Provide default AI message if none provided (backend will do AI analysis)
+                if not ai_message:
+                    ai_message = "Analyzing visitor at front door..."
+                    _LOGGER.info("No AI message provided, using default. Backend will perform AI analysis using configured template.")
+                
+                if not ai_title:
+                    ai_title = "Doorbell Alert"
+                    _LOGGER.info("No AI title provided, using default.")
+                
+                # Log the configured AI template for debugging
+                if automation_config.get("ai_prompt_template"):
                     template_name = automation_config.get("ai_prompt_template", "professional")
-                    custom_prompt = automation_config.get("custom_ai_prompt", "")
-                    
-                    if template_name == "custom" and custom_prompt:
-                        ai_prompt = custom_prompt
-                    else:
-                        template_config = AI_PROMPT_TEMPLATES.get(template_name, AI_PROMPT_TEMPLATES["professional"])
-                        ai_prompt = template_config["prompt"]
-                    
-                    # Add weather context if enabled
-                    if automation_config.get("enable_weather_context", True):
-                        weather_info = f"\n\nCurrent weather: {weather_condition}, {weather_temp}°C"
-                        ai_prompt += weather_info
-                    
-                    _LOGGER.info("Using AI prompt template '%s' for analysis", template_name)
+                    _LOGGER.info("Backend will use AI prompt template: %s", template_name)
                 
                 # Create comprehensive event data
                 event_data = {
