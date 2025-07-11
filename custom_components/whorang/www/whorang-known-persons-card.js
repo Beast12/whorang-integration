@@ -933,15 +933,20 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   }
 
   async getWorkingAvatarUrl(person) {
+    console.log(`Getting avatar URL for person ${person.id} (${person.name})`);
+    
     // First try direct avatar URL from person data
     if (person.avatar_url) {
+      console.log(`Trying direct avatar URL: ${person.avatar_url}`);
       if (await this.testImageUrl(person.avatar_url)) {
+        console.log(`Direct avatar URL works: ${person.avatar_url}`);
         return person.avatar_url;
       }
     }
     
     // Try multiple avatar URL patterns - prioritize the PersonController endpoint
     const baseUrls = this.getWhoRangBaseUrlCandidates();
+    console.log(`Trying ${baseUrls.length} base URLs for person ${person.id}:`, baseUrls);
     
     for (const baseUrl of baseUrls) {
       // Try different avatar endpoint patterns - PersonController endpoint first
@@ -952,17 +957,22 @@ class WhoRangKnownPersonsCard extends HTMLElement {
         `${baseUrl}/api/persons/${person.id}/thumbnail`      // Another alternative
       ];
       
+      console.log(`Testing ${avatarPatterns.length} avatar patterns for base URL ${baseUrl}`);
+      
       for (const avatarUrl of avatarPatterns) {
+        console.log(`Testing avatar URL: ${avatarUrl}`);
         if (await this.testImageUrl(avatarUrl)) {
           // Cache the working base URL for future use
           this._workingBaseUrl = baseUrl;
-          console.log(`Found working avatar URL for person ${person.id}: ${avatarUrl}`);
+          console.log(`✅ Found working avatar URL for person ${person.id}: ${avatarUrl}`);
           return avatarUrl;
+        } else {
+          console.log(`❌ Avatar URL failed: ${avatarUrl}`);
         }
       }
     }
     
-    console.warn(`No working avatar URL found for person ${person.id} (${person.name})`);
+    console.warn(`❌ No working avatar URL found for person ${person.id} (${person.name})`);
     return null; // No avatar available - will show placeholder
   }
 
@@ -1440,44 +1450,40 @@ class WhoRangKnownPersonsCard extends HTMLElement {
 
   async viewPersonFaces(personId) {
     try {
-      // Get person faces from backend - need to get actual detected faces, not just encodings
+      console.log(`Loading faces for person ${personId}`);
+      
+      // Get person faces from backend using the correct endpoint
       const baseUrls = this.getWhoRangBaseUrlCandidates();
       let facesData = null;
+      let workingBaseUrl = null;
       
       for (const baseUrl of baseUrls) {
         try {
-          // Try to get detected faces for this person directly
-          const facesResponse = await fetch(`${baseUrl}/api/detected-faces?person_id=${personId}`);
+          console.log(`Trying to fetch faces from: ${baseUrl}/api/detected-faces/person/${personId}`);
+          
+          // Use the correct DetectedFacesController endpoint
+          const facesResponse = await fetch(`${baseUrl}/api/detected-faces/person/${personId}`);
           if (facesResponse.ok) {
             const facesResult = await facesResponse.json();
+            console.log(`Faces response from ${baseUrl}:`, facesResult);
+            
             if (facesResult && Array.isArray(facesResult.faces)) {
+              workingBaseUrl = baseUrl;
               facesData = facesResult.faces.map(face => ({
                 id: face.id,
-                image_url: `${baseUrl}/api/faces/${face.id}/image`,
+                image_url: face.face_crop_path ? `${baseUrl}/${face.face_crop_path.replace(/^\/+/, '')}` : 
+                          face.thumbnail_path ? `${baseUrl}/${face.thumbnail_path.replace(/^\/+/, '')}` :
+                          `${baseUrl}/api/faces/${face.id}/image`,
                 quality_score: face.quality_score || 0,
                 detection_date: face.created_at,
-                confidence: face.confidence || 0
+                confidence: face.confidence || 0,
+                original_image: face.original_image
               }));
+              console.log(`Found ${facesData.length} faces for person ${personId}`);
               break;
             }
-          }
-          
-          // Fallback: try the person endpoint and extract encodings
-          const personResponse = await fetch(`${baseUrl}/api/faces/persons/${personId}`);
-          if (personResponse.ok) {
-            const personData = await personResponse.json();
-            if (personData && personData.id) {
-              // PersonController returns encodings, but we need to convert them to face objects
-              const encodings = personData.encodings || [];
-              facesData = encodings.map((encoding, index) => ({
-                id: encoding.id || `encoding_${index}`,
-                image_url: `${baseUrl}/api/faces/persons/${personId}/avatar`, // Use avatar as fallback
-                quality_score: 0.8, // Default quality
-                detection_date: encoding.created_at || new Date().toISOString(),
-                confidence: 0.9 // Default confidence
-              }));
-              break;
-            }
+          } else {
+            console.warn(`Failed to fetch faces from ${baseUrl}: ${facesResponse.status} ${facesResponse.statusText}`);
           }
         } catch (error) {
           console.warn(`Failed to fetch faces from ${baseUrl}:`, error);
@@ -1485,10 +1491,37 @@ class WhoRangKnownPersonsCard extends HTMLElement {
         }
       }
       
+      // If no faces found via detected-faces endpoint, try the person endpoint as fallback
+      if (!facesData && workingBaseUrl) {
+        try {
+          console.log(`Trying fallback person endpoint: ${workingBaseUrl}/api/faces/persons/${personId}`);
+          const personResponse = await fetch(`${workingBaseUrl}/api/faces/persons/${personId}`);
+          if (personResponse.ok) {
+            const personData = await personResponse.json();
+            console.log(`Person data from ${workingBaseUrl}:`, personData);
+            
+            if (personData && personData.encodings && personData.encodings.length > 0) {
+              // Convert encodings to face objects (fallback)
+              facesData = personData.encodings.map((encoding, index) => ({
+                id: encoding.id || `encoding_${index}`,
+                image_url: `${workingBaseUrl}/api/faces/persons/${personId}/avatar`,
+                quality_score: 0.8, // Default quality
+                detection_date: encoding.created_at || new Date().toISOString(),
+                confidence: 0.9 // Default confidence
+              }));
+              console.log(`Using ${facesData.length} encodings as faces for person ${personId}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`Fallback person endpoint failed:`, error);
+        }
+      }
+      
       if (facesData && facesData.length > 0) {
         this.showPersonFacesDialog(personId, facesData);
       } else {
-        this.showNotification('No faces found for this person', 'info');
+        console.warn(`No faces found for person ${personId}`);
+        this.showNotification(`No faces found for this person. They may need to be detected and assigned first.`, 'info');
       }
     } catch (error) {
       console.error('Failed to view person faces:', error);
