@@ -1,0 +1,185 @@
+name: Bug Report
+description: Report a bug or issue with the WhoRang AI Doorbell Integration
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees:
+  - Beast12
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please check all applicable items before submitting
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have read the [troubleshooting guide](https://github.com/Beast12/whorang-integration/blob/main/docs/troubleshooting/common-issues.md)
+          required: true
+        - label: I have checked the integration and backend logs for error messages
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Describe what happened and what you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      description: What version of Home Assistant are you running?
+      options:
+        - "2024.12.x"
+        - "2024.11.x"
+        - "2024.10.x"
+        - "2024.9.x"
+        - "2024.8.x"
+        - "2024.7.x"
+        - "2024.6.x"
+        - "2023.12.x"
+        - "2023.11.x"
+        - "2023.10.x"
+        - "2023.9.x"
+        - "2023.8.x"
+        - "2023.7.x"
+        - "2023.6.x"
+        - "2023.5.x"
+        - "2023.4.x"
+        - "2023.3.x"
+        - "2023.2.x"
+        - "2023.1.x"
+        - "Other (please specify in additional context)"
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration Version
+      description: What version of the WhoRang integration are you using?
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend_type
+    attributes:
+      label: Backend Type
+      description: How is your WhoRang backend deployed?
+      options:
+        - "Home Assistant Add-on"
+        - "Docker Compose"
+        - "Docker (standalone)"
+        - "Manual installation"
+        - "Other (please specify)"
+    validations:
+      required: true
+
+  - type: input
+    id: backend_version
+    attributes:
+      label: Backend Version
+      description: What version of the WhoRang backend are you using?
+      placeholder: "1.0.0"
+
+  - type: dropdown
+    id: installation_type
+    attributes:
+      label: Home Assistant Installation Type
+      description: How is Home Assistant installed?
+      options:
+        - "Home Assistant OS"
+        - "Home Assistant Supervised"
+        - "Home Assistant Container"
+        - "Home Assistant Core"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: |
+        Please include relevant logs from:
+        - Home Assistant logs (Settings → System → Logs, filter for "whorang")
+        - Backend logs (if accessible)
+        - Any error messages you see
+      placeholder: Paste logs here...
+      render: text
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: |
+        Please share relevant configuration (remove sensitive information like API keys):
+        - Integration configuration
+        - Relevant automation configuration
+        - Backend configuration (if applicable)
+      placeholder: |
+        Integration config:
+        Host: homeassistant.local
+        Port: 3001
+        SSL: false
+        
+        AI Providers configured: OpenAI, Local
+      render: yaml
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: |
+        Add any other context about the problem here:
+        - Screenshots
+        - Network setup details
+        - Recent changes to your system
+        - Workarounds you've tried
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Final Checklist
+      options:
+        - label: I have removed any sensitive information (API keys, passwords, etc.) from this report
+          required: true
+        - label: I understand this is a public issue and will be visible to everyone
+          required: true

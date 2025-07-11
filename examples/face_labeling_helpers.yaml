@@ -1,0 +1,227 @@
+# WhoRang Face Labeling Helper Entities
+# Add these to your configuration.yaml to enable the face labeling dashboard
+
+# Input helpers for face labeling
+input_number:
+  face_id_input:
+    name: Face ID for Labeling
+    min: 1
+    max: 10000
+    step: 1
+    mode: box
+    icon: mdi:identifier
+
+input_text:
+  person_name_input:
+    name: Person Name for Labeling
+    max: 100
+    icon: mdi:account
+    
+  quick_person_name:
+    name: Quick Person Name
+    max: 100
+    icon: mdi:account-fast
+
+# Optional: Input select for common names (customize with your frequent visitors)
+input_select:
+  common_visitor_names:
+    name: Common Visitor Names
+    options:
+      - "John Doe"
+      - "Jane Smith"
+      - "Delivery Person"
+      - "Mail Carrier"
+      - "Neighbor"
+      - "Family Member"
+      - "Friend"
+      - "Other"
+    icon: mdi:account-group
+
+# Optional: Input boolean for face labeling mode
+input_boolean:
+  face_labeling_mode:
+    name: Face Labeling Mode
+    icon: mdi:face-recognition
+
+# Template sensors for enhanced face labeling experience
+template:
+  - sensor:
+      - name: "WhoRang Face Labeling Status"
+        state: >
+          {% set unknown_count = states('sensor.whorang_unknown_faces') | int %}
+          {% if unknown_count == 0 %}
+            No faces to label
+          {% elif unknown_count == 1 %}
+            1 face needs labeling
+          {% else %}
+            {{ unknown_count }} faces need labeling
+          {% endif %}
+        attributes:
+          unknown_faces_count: "{{ states('sensor.whorang_unknown_faces') | int }}"
+          next_face_id: >
+            {% set next_face = state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') %}
+            {{ next_face.face_id if next_face else 'None' }}
+          next_face_quality: >
+            {% set next_face = state_attr('sensor.whorang_unknown_faces', 'next_face_to_label') %}
+            {{ next_face.quality_score if next_face else 'N/A' }}
+          labeling_ready: >
+            {{ states('sensor.whorang_unknown_faces') | int > 0 and 
+               state_attr('sensor.whorang_unknown_faces', 'face_details') is not none }}
+
+      - name: "WhoRang Best Quality Unknown Face"
+        state: >
+          {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+          {% if face_details %}
+            {% set best_face = face_details | sort(attribute='quality_score', reverse=true) | first %}
+            Face {{ best_face.face_id }}
+          {% else %}
+            No faces available
+          {% endif %}
+        attributes:
+          face_id: >
+            {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+            {% if face_details %}
+              {% set best_face = face_details | sort(attribute='quality_score', reverse=true) | first %}
+              {{ best_face.face_id }}
+            {% else %}
+              null
+            {% endif %}
+          quality_score: >
+            {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+            {% if face_details %}
+              {% set best_face = face_details | sort(attribute='quality_score', reverse=true) | first %}
+              {{ best_face.quality_score }}
+            {% else %}
+              0
+            {% endif %}
+          face_image_url: >
+            {% set face_details = state_attr('sensor.whorang_unknown_faces', 'face_details') %}
+            {% if face_details %}
+              {% set best_face = face_details | sort(attribute='quality_score', reverse=true) | first %}
+              {{ best_face.face_image_url }}
+            {% else %}
+              null
+            {% endif %}
+
+# Scripts for common face labeling workflows
+script:
+  whorang_label_best_face:
+    alias: "Label Best Quality Face"
+    description: "Label the highest quality unknown face"
+    fields:
+      person_name:
+        description: "Name to assign to the face"
+        example: "John Doe"
+    sequence:
+      - service: whorang.label_face
+        data:
+          face_id: "{{ state_attr('sensor.whorang_best_quality_unknown_face', 'face_id') }}"
+          person_name: "{{ person_name }}"
+      - service: notify.persistent_notification
+        data:
+          title: "Face Labeled"
+          message: "Face {{ state_attr('sensor.whorang_best_quality_unknown_face', 'face_id') }} has been labeled as {{ person_name }}"
+
+  whorang_refresh_and_notify:
+    alias: "Refresh Unknown Faces and Notify"
+    description: "Refresh unknown faces list and send notification if faces found"
+    sequence:
+      - service: whorang.get_unknown_faces
+        data:
+          limit: 50
+          quality_threshold: 0.6
+      - delay: "00:00:02"  # Wait for sensor to update
+      - condition: template
+        value_template: "{{ states('sensor.whorang_unknown_faces') | int > 0 }}"
+      - service: notify.persistent_notification
+        data:
+          title: "Unknown Faces Found"
+          message: >
+            Found {{ states('sensor.whorang_unknown_faces') }} unknown face(s) requiring labeling.
+            Best quality face: {{ state_attr('sensor.whorang_best_quality_unknown_face', 'face_id') }}
+            (Quality: {{ state_attr('sensor.whorang_best_quality_unknown_face', 'quality_score') }})
+
+  whorang_quick_label_workflow:
+    alias: "Quick Face Labeling Workflow"
+    description: "Complete workflow for quick face labeling"
+    fields:
+      face_id:
+        description: "ID of the face to label"
+        example: 8
+      person_name:
+        description: "Name to assign to the face"
+        example: "John Doe"
+      create_new_person:
+        description: "Whether to create a new person (true) or use existing (false)"
+        example: true
+    sequence:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ create_new_person | default(false) }}"
+            sequence:
+              - service: whorang.create_person_from_face
+                data:
+                  face_id: "{{ face_id }}"
+                  person_name: "{{ person_name }}"
+                  description: "Created via quick labeling workflow"
+        default:
+          - service: whorang.label_face
+            data:
+              face_id: "{{ face_id }}"
+              person_name: "{{ person_name }}"
+      - service: notify.persistent_notification
+        data:
+          title: "Face Labeling Complete"
+          message: >
+            Face {{ face_id }} has been labeled as "{{ person_name }}".
+            {% if create_new_person | default(false) %}
+            New person created in the system.
+            {% else %}
+            Assigned to existing person.
+            {% endif %}
+
+# Automations for enhanced face labeling experience
+automation:
+  - alias: "WhoRang - Auto Refresh Unknown Faces"
+    description: "Automatically refresh unknown faces when new visitors are detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.whorang_latest_face_detection
+        to: "1 face detected"
+    condition:
+      - condition: template
+        value_template: "{{ state_attr('sensor.whorang_latest_face_detection', 'requires_labeling') == true }}"
+    action:
+      - delay: "00:00:05"  # Wait for face processing to complete
+      - service: whorang.get_unknown_faces
+        data:
+          limit: 50
+          quality_threshold: 0.6
+
+  - alias: "WhoRang - Face Labeling Mode Notification"
+    description: "Send notification when face labeling mode is enabled and faces are available"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.face_labeling_mode
+        to: "on"
+    condition:
+      - condition: template
+        value_template: "{{ states('sensor.whorang_unknown_faces') | int > 0 }}"
+    action:
+      - service: notify.persistent_notification
+        data:
+          title: "Face Labeling Mode Active"
+          message: >
+            Face labeling mode is now active.
+            {{ states('sensor.whorang_unknown_faces') }} unknown face(s) are ready for labeling.
+            Best quality face: {{ state_attr('sensor.whorang_best_quality_unknown_face', 'face_id') }}
+
+# Optional: Lovelace dashboard button for quick access
+# Add this to your dashboard:
+# - type: button
+#   name: "Face Labeling Dashboard"
+#   icon: mdi:face-recognition
+#   tap_action:
+#     action: navigate
+#     navigation_path: /dashboard-whorang-faces

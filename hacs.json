@@ -1,0 +1,8 @@
+{
+  "name": "WhoRang AI Doorbell Integration",
+  "content_in_root": false,
+  "filename": "whorang",
+  "country": ["US", "CA", "GB", "DE", "FR", "NL", "BE", "AU", "SE", "NO", "DK", "FI", "IT", "ES", "PT"],
+  "render_readme": false,
+  "homeassistant": "2023.1.0"
+}

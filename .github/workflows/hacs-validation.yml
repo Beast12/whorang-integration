@@ -1,0 +1,128 @@
+---
+name: HACS Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  hacs-validation:
+    runs-on: ubuntu-latest
+    name: HACS Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
+
+  hassfest:
+    runs-on: ubuntu-latest
+    name: Hassfest Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+  validate-hacs-json:
+    name: Validate HACS JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Validate hacs.json
+        run: |
+          python -c "
+          import json
+          
+          # Load HACS manifest
+          with open('hacs.json') as f:
+              hacs_manifest = json.load(f)
+          
+          # Check required fields
+          required_fields = ['name', 'content_in_root', 'filename', 'homeassistant']
+          for field in required_fields:
+              if field not in hacs_manifest:
+                  raise ValueError(f'Missing required field: {field}')
+          
+          print('✅ HACS JSON validation passed')
+          "
+
+  documentation-links:
+    runs-on: ubuntu-latest
+    name: Check Documentation Links
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install markdown-link-check
+        run: npm install -g markdown-link-check
+
+      - name: Check documentation links
+        run: |
+          find docs -name "*.md" -exec \
+          markdown-link-check --config .markdown-link-check.json {} \;
+
+  yaml-lint:
+    runs-on: ubuntu-latest
+    name: Lint YAML files
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint YAML files
+        run: |
+          yamllint .github/workflows/ \
+            --config-data "{extends: default, \
+            rules: {line-length: {max: 120}, \
+            trailing-spaces: disable, \
+            document-start: disable, \
+            truthy: disable}}"
+
+  check-version-consistency:
+    name: Check Version Consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check version consistency
+        run: |
+          MANIFEST_VERSION=$(grep '"version"' \
+            custom_components/whorang/manifest.json | \
+            sed 's/.*"version": "\(.*\)".*/\1/')
+          
+          if ! grep -q "\[$MANIFEST_VERSION\]" CHANGELOG.md; then
+            echo "❌ Version $MANIFEST_VERSION not found in CHANGELOG.md"
+            exit 1
+          fi
+          
+          echo "✅ Version consistency check passed: $MANIFEST_VERSION"
