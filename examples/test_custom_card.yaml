@@ -1,8 +1,0 @@
-# Test Custom Card Dashboard
-title: Test Custom Card
-views:
-  - title: Test
-    cards:
-      - type: custom:whorang-face-manager-card
-        entity: sensor.whorang_ai_doorbell_face_gallery
-        title: Face Manager Test

@@ -1,8 +1,0 @@
-# Test Simple Card Dashboard
-title: Test Simple Card
-views:
-  - title: Test Simple
-    cards:
-      - type: custom:whorang-face-manager-simple-card
-        entity: sensor.whorang_ai_doorbell_face_gallery
-        title: Simple Face Manager Test
