@@ -158,6 +158,10 @@ git push origin main
 echo "🏷️  Pushing development tag..."
 git push -f origin v1.1.0-dev
 
+# Delete existing release if it exists
+echo "🗑️  Deleting existing GitHub release (if exists)..."
+gh release delete v1.1.0-dev --yes 2>/dev/null || echo "   (No existing release to delete)"
+
 # Create GitHub release
 echo "🚀 Creating GitHub release..."
 gh release create v1.1.0-dev \
