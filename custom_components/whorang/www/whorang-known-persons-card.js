@@ -1575,7 +1575,7 @@ class WhoRangKnownPersonsCard extends HTMLElement {
           <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" 
                data-candidates="${candidatesJson}"
                data-current-index="0"
-               onerror="this.parentElement.parentElement.tryNextImageUrl(this);"
+               onerror="window.tryNextFaceImageUrl(this);"
                onload="console.log('Face image loaded successfully: ${face.image_url}');" />
           <div style="display: none; padding: 20px; text-align: center; color: #999; border: 2px dashed #ccc; border-radius: 8px;">
             Image failed to load<br>
@@ -1730,3 +1730,25 @@ console.info(
 
 // Force immediate empty state display
 console.log('WhoRang Known Persons Card: Loaded with immediate empty state fix');
+
+// Global function for face image fallback
+window.tryNextFaceImageUrl = function(imgElement) {
+  const candidates = JSON.parse(imgElement.getAttribute('data-candidates') || '[]');
+  let currentIndex = parseInt(imgElement.getAttribute('data-current-index') || '0');
+  
+  console.error(`Face image failed to load: ${imgElement.src}`);
+  
+  // Try next URL
+  currentIndex++;
+  if (currentIndex < candidates.length) {
+    const nextUrl = candidates[currentIndex];
+    console.log(`Trying next face image URL (${currentIndex + 1}/${candidates.length}): ${nextUrl}`);
+    imgElement.setAttribute('data-current-index', currentIndex.toString());
+    imgElement.src = nextUrl;
+  } else {
+    // All URLs failed, show error message
+    console.error(`All ${candidates.length} face image URLs failed for face`);
+    imgElement.style.display = 'none';
+    imgElement.nextElementSibling.style.display = 'block';
+  }
+};
