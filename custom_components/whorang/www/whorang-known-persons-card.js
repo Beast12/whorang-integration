@@ -399,17 +399,18 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     const statsSummary = this.shadowRoot.getElementById('stats-summary');
     const controls = this.shadowRoot.getElementById('controls');
     
-    // Update stats display
+    // Update stats display - always show count, never show loading
     if (this.config.show_stats && this.galleryReady) {
       statsSummary.style.display = 'grid';
-      statsInfo.textContent = `${this.totalKnown} persons, ${this.totalFaces} faces`;
+      statsInfo.textContent = `${this.totalKnown || 0} persons, ${this.totalFaces || 0} faces`;
       
-      this.shadowRoot.getElementById('total-persons').textContent = this.totalKnown;
-      this.shadowRoot.getElementById('total-faces').textContent = this.totalFaces;
-      this.shadowRoot.getElementById('avg-faces').textContent = this.avgFaces;
+      this.shadowRoot.getElementById('total-persons').textContent = this.totalKnown || 0;
+      this.shadowRoot.getElementById('total-faces').textContent = this.totalFaces || 0;
+      this.shadowRoot.getElementById('avg-faces').textContent = this.avgFaces || 0;
     } else {
       statsSummary.style.display = 'none';
-      statsInfo.textContent = this.galleryReady ? `${this.totalKnown} known persons` : 'Loading...';
+      // Always show count, never show loading
+      statsInfo.textContent = `${this.totalKnown || 0} known persons`;
     }
     
     // Show/hide controls
@@ -525,41 +526,16 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   renderPersonsGrid() {
     const grid = this.shadowRoot.getElementById('persons-grid');
     
-    // Check if we have any persons data at all
+    // If there are no persons, always show empty state (no loading)
     if (this.persons.length === 0) {
-      // Show empty state if we have confirmed no persons OR if gallery is explicitly ready
-      if (this.galleryReady === true || 
-          (this.galleryReady === false && this.totalKnown === 0) ||
-          (this.totalKnown === 0 && this.totalFaces === 0)) {
-        // We have confirmed data showing no persons
-        grid.innerHTML = `
-          <div class="empty-state" style="grid-column: 1 / -1;">
-            <div class="icon">👥</div>
-            <div>No known persons yet</div>
-            <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
-          </div>
-        `;
-        return;
-      } else if (this.galleryReady === undefined || this.galleryReady === null) {
-        // Still loading - show loading state
-        grid.innerHTML = `
-          <div class="loading-state" style="grid-column: 1 / -1;">
-            <div class="avatar-loading" style="margin: 0 auto 16px;"></div>
-            <div>Loading known persons...</div>
-          </div>
-        `;
-        return;
-      } else {
-        // Gallery not ready but we have some indication of state
-        grid.innerHTML = `
-          <div class="empty-state" style="grid-column: 1 / -1;">
-            <div class="icon">👥</div>
-            <div>No known persons yet</div>
-            <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
-          </div>
-        `;
-        return;
-      }
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column: 1 / -1;">
+          <div class="icon">👥</div>
+          <div>No known persons yet</div>
+          <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
+        </div>
+      `;
+      return;
     }
     
     // If we have persons but gallery not ready, still show them
