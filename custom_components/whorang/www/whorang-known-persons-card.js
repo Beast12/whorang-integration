@@ -85,6 +85,7 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   }
 
   render() {
+    console.log('WhoRang Known Persons Card: render() called');
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -530,9 +531,11 @@ class WhoRangKnownPersonsCard extends HTMLElement {
 
   renderPersonsGrid() {
     const grid = this.shadowRoot.getElementById('persons-grid');
+    console.log('WhoRang Known Persons Card: renderPersonsGrid() called, persons.length =', this.persons.length);
     
     // If there are no persons, always show empty state (no loading)
     if (this.persons.length === 0) {
+      console.log('WhoRang Known Persons Card: Showing empty state');
       grid.innerHTML = `
         <div class="empty-state" style="grid-column: 1 / -1;">
           <div class="icon">👥</div>
@@ -756,7 +759,10 @@ window.customCards.push({
 });
 
 console.info(
-  '%c WHORANG-KNOWN-PERSONS-CARD %c v1.0.0 ',
+  '%c WHORANG-KNOWN-PERSONS-CARD %c v1.0.1-FIXED ',
   'color: orange; font-weight: bold; background: black',
   'color: white; font-weight: bold; background: dimgray'
 );
+
+// Force immediate empty state display
+console.log('WhoRang Known Persons Card: Loaded with immediate empty state fix');
