@@ -46,6 +46,27 @@ For advanced users and custom setups:
 - **Repository**: [WhoRang Add-on](https://github.com/Beast12/whorang-addon) (includes manual build instructions)
 - **Benefits**: Full control, custom modifications
 
+## 🆕 New to Home Assistant?
+
+If you're new to Home Assistant, here are some key concepts to understand:
+
+### 🏠 What is Home Assistant?
+Home Assistant is an open-source home automation platform that allows you to control and monitor smart devices in your home.
+
+### 🔌 What are Integrations?
+Integrations connect Home Assistant to external services or devices. WhoRang is an integration that adds AI-powered doorbell monitoring to your Home Assistant.
+
+### 📊 What are Entities?
+Entities are the building blocks of Home Assistant - they represent sensors, switches, cameras, etc. WhoRang creates 19+ entities to monitor your doorbell system.
+
+### 🤖 What are Automations?
+Automations allow Home Assistant to automatically perform actions based on triggers. For example, send a notification when someone rings your doorbell.
+
+### 📱 What are Dashboards?
+Dashboards are customizable interfaces where you can view and control your entities. WhoRang includes a sophisticated face management dashboard.
+
+**Ready to get started?** Follow the steps below!
+
 ## 🚀 Quick Start
 
 ### Step 1: Install Backend
@@ -87,45 +108,63 @@ Choose and install the backend service using one of the methods above.
 
 ## 📊 What You Get
 
-### Sensors (9 entities)
+### 🔍 Sensors (14 entities)
 | Entity | Description | Example Value |
 |--------|-------------|---------------|
-| `sensor.whorang_latest_visitor` | Latest visitor information | "Person at door with package" |
-| `sensor.whorang_visitor_count_today` | Today's visitor count | 5 |
-| `sensor.whorang_visitor_count_week` | This week's visitor count | 23 |
-| `sensor.whorang_visitor_count_month` | This month's visitor count | 87 |
-| `sensor.whorang_system_status` | System health status | "Online" |
-| `sensor.whorang_ai_provider_active` | Current AI provider | "openai" |
-| `sensor.whorang_ai_cost_today` | Today's AI processing costs | "$0.15" |
-| `sensor.whorang_ai_response_time` | Latest AI response time | "1.2s" |
-| `sensor.whorang_known_faces_count` | Number of known faces | 12 |
+| `sensor.whorang_ai_doorbell_latest_visitor` | Latest visitor information | "Person at door with package" |
+| `sensor.whorang_ai_doorbell_visitors_today` | Today's visitor count | 5 |
+| `sensor.whorang_ai_doorbell_visitor_count_week` | This week's visitor count | 23 |
+| `sensor.whorang_ai_doorbell_visitor_count_month` | This month's visitor count | 87 |
+| `sensor.whorang_ai_doorbell_system_status` | System health status | "healthy" |
+| `sensor.whorang_ai_doorbell_ai_provider` | Current AI provider | "openai" |
+| `sensor.whorang_ai_doorbell_ai_cost_today` | Today's AI processing costs | "$0.15" |
+| `sensor.whorang_ai_doorbell_ai_cost_this_month` | This month's AI costs | "$4.23" |
+| `sensor.whorang_ai_doorbell_ai_response_time` | Latest AI response time | "1200" (ms) |
+| `sensor.whorang_ai_doorbell_known_faces` | Number of known faces | 12 |
+| `sensor.whorang_ai_doorbell_unknown_faces` | Unknown faces needing labeling | 3 |
+| `sensor.whorang_ai_doorbell_latest_face_detection` | Latest face detection results | "2 faces detected" |
+| `sensor.whorang_ai_doorbell_face_gallery` | **Face gallery data with images** | Complex object with face data |
+| `sensor.whorang_ai_doorbell_known_persons_gallery` | **Known persons with avatars** | Complex object with person data |
 
-### Binary Sensors (5 entities)
+### 🚨 Binary Sensors (5 entities)
 | Entity | Description | Device Class |
 |--------|-------------|--------------|
-| `binary_sensor.whorang_doorbell` | Recent doorbell activity | - |
-| `binary_sensor.whorang_motion` | Motion detection | motion |
-| `binary_sensor.whorang_known_visitor` | Known visitor detected | occupancy |
-| `binary_sensor.whorang_system_online` | System connectivity | connectivity |
-| `binary_sensor.whorang_ai_processing` | AI processing status | - |
+| `binary_sensor.whorang_ai_doorbell_doorbell` | Recent doorbell activity | - |
+| `binary_sensor.whorang_ai_doorbell_motion` | Motion detection | motion |
+| `binary_sensor.whorang_ai_doorbell_known_visitor` | Known visitor detected | occupancy |
+| `binary_sensor.whorang_ai_doorbell_system_online` | System connectivity | connectivity |
+| `binary_sensor.whorang_ai_doorbell_ai_processing` | AI processing status | - |
 
-### Camera (1 entity)
+### 📷 Camera (1 entity)
 | Entity | Description |
 |--------|-------------|
-| `camera.whorang_latest_image` | Latest doorbell camera image |
+| `camera.whorang_ai_doorbell_latest_image` | Latest doorbell camera image |
 
-### Controls (5 entities)
+### 🎛️ Controls (5 entities)
 | Entity | Description | Options |
 |--------|-------------|---------|
-| `select.whorang_ai_provider` | AI provider selection | openai, local, claude, gemini, google-cloud-vision |
-| `select.whorang_ai_model` | AI model selection | Provider-specific models |
-| `button.whorang_trigger_analysis` | Manually trigger AI analysis | - |
-| `button.whorang_test_webhook` | Test webhook functionality | - |
-| `button.whorang_refresh_data` | Force data refresh | - |
+| `select.whorang_ai_doorbell_ai_provider` | AI provider selection | openai, local, claude, gemini, google-cloud-vision |
+| `select.whorang_ai_doorbell_ai_model` | AI model selection | Provider-specific models (dynamic) |
+| `button.whorang_ai_doorbell_trigger_analysis` | Manually trigger AI analysis | - |
+| `button.whorang_ai_doorbell_test_webhook` | Test webhook functionality | - |
+| `button.whorang_ai_doorbell_refresh_data` | Force data refresh | - |
 
-### Device Trackers (Dynamic)
+### 📍 Device Trackers (Dynamic)
 Dynamic device trackers are created for each known person:
-- `device_tracker.whorang_visitors_[person_name]` - Presence tracking for known visitors
+- `device_tracker.whorang_ai_doorbell_visitors_[person_name]` - Presence tracking for known visitors
+
+### 🎨 Visual Face Manager
+The integration includes a sophisticated **visual face management interface**:
+
+- **Custom Card**: `whorang-face-manager-card` for interactive face labeling
+- **Face Gallery Sensor**: Provides unknown faces with full image URLs
+- **Known Persons Gallery**: Displays known people with avatars
+- **Interactive Interface**: Click faces to select and label them
+- **Batch Operations**: Label multiple faces as the same person
+- **Progress Tracking**: Visual progress of face labeling completion
+- **Quality Indicators**: Face detection quality scores and confidence levels
+
+See the complete dashboard configuration in [`examples/dashboard.yaml`](examples/dashboard.yaml).
 
 ## 🎯 Essential Automations
 
@@ -135,15 +174,15 @@ automation:
   - alias: "Doorbell Pressed"
     trigger:
       - platform: state
-        entity_id: binary_sensor.whorang_doorbell
+        entity_id: binary_sensor.whorang_ai_doorbell_doorbell
         to: "on"
     action:
       - service: notify.mobile_app_your_phone
         data:
           title: "🔔 Doorbell"
-          message: "{{ states('sensor.whorang_latest_visitor') }}"
+          message: "{{ states('sensor.whorang_ai_doorbell_latest_visitor') }}"
           data:
-            image: "/api/camera_proxy/camera.whorang_latest_image"
+            image: "/api/camera_proxy/camera.whorang_ai_doorbell_latest_image"
 ```
 
 ### Known Visitor Welcome
@@ -152,14 +191,14 @@ automation:
   - alias: "Welcome Known Visitor"
     trigger:
       - platform: state
-        entity_id: binary_sensor.whorang_known_visitor
+        entity_id: binary_sensor.whorang_ai_doorbell_known_visitor
         to: "on"
     action:
       - service: tts.google_translate_say
         data:
           entity_id: media_player.living_room_speaker
           message: >
-            Welcome home, {{ state_attr('binary_sensor.whorang_known_visitor', 'person_name') }}!
+            Welcome home, {{ state_attr('binary_sensor.whorang_ai_doorbell_known_visitor', 'person_name') }}!
 ```
 
 ### Security Alert for Unknown Visitors
@@ -168,22 +207,44 @@ automation:
   - alias: "Unknown Visitor Alert"
     trigger:
       - platform: state
-        entity_id: binary_sensor.whorang_doorbell
+        entity_id: binary_sensor.whorang_ai_doorbell_doorbell
         to: "on"
     condition:
       - condition: state
-        entity_id: binary_sensor.whorang_known_visitor
+        entity_id: binary_sensor.whorang_ai_doorbell_known_visitor
         state: "off"
     action:
       - service: notify.mobile_app_your_phone
         data:
           title: "🚨 Unknown Visitor"
-          message: "{{ states('sensor.whorang_latest_visitor') }}"
+          message: "{{ states('sensor.whorang_ai_doorbell_latest_visitor') }}"
           data:
-            image: "/api/camera_proxy/camera.whorang_latest_image"
+            image: "/api/camera_proxy/camera.whorang_ai_doorbell_latest_image"
             actions:
               - action: "trigger_analysis"
                 title: "Analyze Visitor"
+```
+
+### Unknown Face Detection Alert
+```yaml
+automation:
+  - alias: "Unknown Face Detected"
+    trigger:
+      - platform: state
+        entity_id: sensor.whorang_ai_doorbell_face_gallery
+        attribute: total_unknown
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.attributes.total_unknown | int > trigger.from_state.attributes.total_unknown | int }}"
+    action:
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "🔍 New Unknown Face"
+          message: "{{ state_attr('sensor.whorang_ai_doorbell_face_gallery', 'total_unknown') }} faces need labeling"
+          data:
+            actions:
+              - action: "open_face_manager"
+                title: "Label Faces"
 ```
 
 ## 🛠️ Services
@@ -240,50 +301,169 @@ data:
   format: "json"                       # json or csv
 ```
 
-## 📱 Dashboard Example
+## 👤 Face Management Services
+
+### `whorang.label_face`
+Assign a name to an unknown face for recognition.
+```yaml
+service: whorang.label_face
+data:
+  face_id: 8
+  person_name: "John Doe"
+```
+
+### `whorang.create_person_from_face`
+Create a new person and assign the face to them.
+```yaml
+service: whorang.create_person_from_face
+data:
+  face_id: 8
+  person_name: "Jane Smith"
+  description: "Family member"  # Optional
+```
+
+### `whorang.get_unknown_faces`
+Retrieve and update the list of unknown faces requiring labeling.
+```yaml
+service: whorang.get_unknown_faces
+data:
+  limit: 50                    # Optional, default 50
+  quality_threshold: 0.6       # Optional, minimum quality score
+```
+
+### `whorang.batch_label_faces`
+Label multiple faces as the same person (used by visual interface).
+```yaml
+service: whorang.batch_label_faces
+data:
+  face_ids: [8, 12, 15]
+  person_name: "John Doe"
+  create_person: true          # Optional, create person if doesn't exist
+```
+
+### `whorang.delete_face`
+Delete a detected face from the system.
+```yaml
+service: whorang.delete_face
+data:
+  face_id: 8
+```
+
+### `whorang.get_face_similarities`
+Find similar faces to help with labeling decisions.
+```yaml
+service: whorang.get_face_similarities
+data:
+  face_id: 8
+  threshold: 0.6               # Optional, similarity threshold
+  limit: 10                    # Optional, max results
+```
+
+## 🔧 Advanced Services
+
+### `whorang.process_doorbell_event`
+Process a complete doorbell event with image and context data.
+```yaml
+service: whorang.process_doorbell_event
+data:
+  image_url: "http://192.168.1.100:8123/local/doorbell_snapshot.jpg"
+  ai_message: "A person is standing at the front door"  # Optional
+  ai_title: "Visitor Detected"                          # Optional
+  location: "front_door"                                # Optional
+  weather_temp: "{{ state_attr('weather.home', 'temperature') }}"     # Optional
+  weather_humidity: "{{ state_attr('weather.home', 'humidity') }}"    # Optional
+  weather_condition: "{{ states('weather.home') }}"                   # Optional
+```
+
+### `whorang.get_available_models`
+Get list of available models for current or specified provider.
+```yaml
+service: whorang.get_available_models
+data:
+  provider: "openai"           # Optional, uses current if not specified
+```
+
+### `whorang.refresh_ollama_models`
+Refresh the list of available Ollama models from the local instance.
+```yaml
+service: whorang.refresh_ollama_models
+```
+
+### `whorang.test_ollama_connection`
+Test connection to the Ollama service and get status information.
+```yaml
+service: whorang.test_ollama_connection
+```
+
+### `whorang.test_webhook`
+Test webhook functionality by sending a test event.
+```yaml
+service: whorang.test_webhook
+```
+
+## 📱 Complete Dashboard Setup
+
+### Quick Setup
+1. Copy the contents of [`examples/dashboard.yaml`](examples/dashboard.yaml)
+2. Go to **Settings** → **Dashboards** → **Add Dashboard**
+3. Choose **"Take control"** and paste the YAML
+4. Update the `whorang_url` to match your backend URL
+
+### Dashboard Features
+- **Visual Face Manager**: Interactive face labeling interface
+- **System Status**: Real-time system health monitoring  
+- **Quick Actions**: One-click operations for common tasks
+- **Usage Guide**: Built-in help and instructions
+- **Manual Controls**: Fallback controls for advanced users
+
+### Required Custom Cards
+The dashboard uses the `whorang-face-manager-card` which is included with the integration.
+If you see "Custom element doesn't exist", restart Home Assistant.
+
+### Simple Dashboard Example
 
 ```yaml
 type: vertical-stack
 cards:
   - type: picture-entity
-    entity: camera.whorang_latest_image
+    entity: camera.whorang_ai_doorbell_latest_image
     name: Latest Visitor
     show_state: false
     
   - type: glance
     title: Visitor Statistics
     entities:
-      - entity: sensor.whorang_visitor_count_today
+      - entity: sensor.whorang_ai_doorbell_visitors_today
         name: Today
-      - entity: sensor.whorang_visitor_count_week
+      - entity: sensor.whorang_ai_doorbell_visitor_count_week
         name: Week
-      - entity: sensor.whorang_visitor_count_month
+      - entity: sensor.whorang_ai_doorbell_visitor_count_month
         name: Month
-      - entity: sensor.whorang_known_faces_count
+      - entity: sensor.whorang_ai_doorbell_known_faces
         name: Known Faces
         
   - type: entities
     title: System Status
     entities:
-      - entity: sensor.whorang_system_status
+      - entity: sensor.whorang_ai_doorbell_system_status
         name: Status
-      - entity: binary_sensor.whorang_system_online
+      - entity: binary_sensor.whorang_ai_doorbell_system_online
         name: Online
-      - entity: sensor.whorang_ai_provider_active
+      - entity: sensor.whorang_ai_doorbell_ai_provider
         name: AI Provider
-      - entity: sensor.whorang_ai_cost_today
+      - entity: sensor.whorang_ai_doorbell_ai_cost_today
         name: AI Cost Today
         
   - type: entities
     title: Controls
     entities:
-      - entity: select.whorang_ai_provider
+      - entity: select.whorang_ai_doorbell_ai_provider
         name: AI Provider
-      - entity: select.whorang_ai_model
+      - entity: select.whorang_ai_doorbell_ai_model
         name: AI Model
-      - entity: button.whorang_trigger_analysis
+      - entity: button.whorang_ai_doorbell_trigger_analysis
         name: Trigger Analysis
-      - entity: button.whorang_refresh_data
+      - entity: button.whorang_ai_doorbell_refresh_data
         name: Refresh Data
 ```
 
@@ -300,6 +480,7 @@ After initial setup, you can configure additional options through the integratio
 
 - **[Installation Guide](docs/installation/hacs-installation.md)** - Detailed installation instructions
 - **[Configuration Guide](docs/configuration/initial-setup.md)** - Complete configuration reference
+- **[Face Management Guide](docs/usage/face-management-guide.md)** - Comprehensive face recognition guide
 - **[Automation Examples](docs/automation/basic-automations.md)** - 15+ ready-to-use automations
 - **[Troubleshooting](docs/troubleshooting/common-issues.md)** - Common issues and solutions
 - **[API Reference](docs/usage/services-reference.md)** - Complete service documentation

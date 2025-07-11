@@ -123,6 +123,7 @@ After successful connection, you can configure AI providers:
 
 2. **Provider Configuration**:
    - Configure API keys for desired external providers
+   - Configure Ollama host/port for local AI processing
    - Local (Ollama) provider is always available
 
 ## Options Configuration
@@ -211,15 +212,50 @@ Model: gpt-4o
 
 **No API Key Required**: Uses local Ollama installation
 
+**Host/Port Configuration**:
+- **Ollama Host**: IP address or hostname of Ollama service
+  - Local installation: `localhost` or `127.0.0.1`
+  - Remote installation: `192.168.1.200` or `ollama.local`
+  - Default: `localhost`
+- **Ollama Port**: Port number for Ollama service
+  - Default: `11434`
+  - Custom installations: Check your Ollama configuration
+
+**Configuration Examples**:
+
+**Local Ollama (Default)**:
+```
+Ollama Host: localhost
+Ollama Port: 11434
+```
+
+**Remote Ollama Server**:
+```
+Ollama Host: 192.168.1.200
+Ollama Port: 11434
+```
+
+**Custom Port Installation**:
+```
+Ollama Host: localhost
+Ollama Port: 8080
+```
+
 **Requirements**:
-- Ollama installed on your system
-- Vision-capable model installed (e.g., `llava`, `bakllava`)
-- Ollama service running and accessible
+- Ollama installed and running on specified host/port
+- Vision-capable model installed (e.g., `llava`, `bakllava`, `llava-phi3`)
+- Network connectivity to Ollama service
 
 **Benefits**:
 - No API costs
 - Complete privacy
 - No internet dependency
+- Custom model support
+
+**Connection Testing**:
+The integration will test the Ollama connection during configuration and show:
+- ✅ "Connected to Ollama at host:port" for successful connections
+- ❌ "Failed to connect to Ollama service" for connection issues
 
 ### Update Settings Configuration
 
