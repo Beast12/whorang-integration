@@ -116,7 +116,8 @@ class IntelligentAutomationEngine:
         self._camera_monitor = CameraMonitoringService(
             self.hass,
             self.config.get("camera_entity"),
-            self.config.get("camera_monitor_mode", "state_change")
+            self.config.get("doorbell_trigger_entity"),
+            self.config.get("monitor_mode", "trigger_entity")
         )
 
         # Initialize notification service
@@ -430,17 +431,19 @@ class IntelligentAutomationEngine:
 
 
 class CameraMonitoringService:
-    """Service for monitoring camera entity changes."""
+    """Service for monitoring doorbell trigger entity and capturing from camera entity."""
 
     def __init__(
         self,
         hass: HomeAssistant,
         camera_entity: Optional[str],
-        monitor_mode: str = "state_change"
+        doorbell_trigger_entity: Optional[str],
+        monitor_mode: str = "trigger_entity"
     ) -> None:
         """Initialize camera monitoring service."""
         self.hass = hass
         self.camera_entity = camera_entity
+        self.doorbell_trigger_entity = doorbell_trigger_entity
         self.monitor_mode = monitor_mode
         self._callback = None
         self._unsubscribe = None
@@ -450,13 +453,32 @@ class CameraMonitoringService:
         self._callback = callback
 
     async def start_monitoring(self) -> bool:
-        """Start monitoring camera entity."""
-        if not self.camera_entity:
-            _LOGGER.error("No camera entity configured for monitoring")
-            return False
-
-        try:
-            if self.monitor_mode == "state_change":
+        """Start monitoring doorbell trigger entity."""
+        if self.monitor_mode == "trigger_entity":
+            if not self.doorbell_trigger_entity:
+                _LOGGER.error("No doorbell trigger entity configured for monitoring")
+                return False
+            
+            try:
+                # Monitor doorbell trigger entity state changes
+                self._unsubscribe = async_track_state_change_event(
+                    self.hass,
+                    [self.doorbell_trigger_entity],
+                    self._handle_doorbell_trigger_change
+                )
+                _LOGGER.info("Started doorbell trigger monitoring for %s", self.doorbell_trigger_entity)
+                return True
+                
+            except Exception as err:
+                _LOGGER.error("Failed to start doorbell trigger monitoring: %s", err)
+                return False
+                
+        elif self.monitor_mode == "camera_state":
+            if not self.camera_entity:
+                _LOGGER.error("No camera entity configured for monitoring")
+                return False
+            
+            try:
                 # Monitor camera state changes
                 self._unsubscribe = async_track_state_change_event(
                     self.hass,
@@ -464,15 +486,19 @@ class CameraMonitoringService:
                     self._handle_camera_state_change
                 )
                 _LOGGER.info("Started camera state monitoring for %s", self.camera_entity)
+                return True
+                
+            except Exception as err:
+                _LOGGER.error("Failed to start camera monitoring: %s", err)
+                return False
 
-            elif self.monitor_mode == "webhook":
-                # Webhook monitoring is handled externally
-                _LOGGER.info("Camera monitoring set to webhook mode")
-
+        elif self.monitor_mode == "webhook":
+            # Webhook monitoring is handled externally
+            _LOGGER.info("Monitoring set to webhook mode")
             return True
 
-        except Exception as err:
-            _LOGGER.error("Failed to start camera monitoring: %s", err)
+        else:
+            _LOGGER.error("Unknown monitor mode: %s", self.monitor_mode)
             return False
 
     async def stop_monitoring(self) -> None:
@@ -480,6 +506,37 @@ class CameraMonitoringService:
         if self._unsubscribe:
             self._unsubscribe()
             self._unsubscribe = None
+
+    @callback
+    def _handle_doorbell_trigger_change(self, event: Event) -> None:
+        """Handle doorbell trigger entity state change event."""
+        if not self._callback:
+            return
+
+        entity_id = event.data.get("entity_id")
+        new_state = event.data.get("new_state")
+        old_state = event.data.get("old_state")
+
+        if not new_state or entity_id != self.doorbell_trigger_entity:
+            return
+
+        # Only trigger on off -> on state change (doorbell pressed)
+        if old_state and old_state.state == "off" and new_state.state == "on":
+            _LOGGER.info("Doorbell trigger detected: %s changed from %s to %s", 
+                        entity_id, old_state.state, new_state.state)
+            
+            # Trigger callback with event data including camera entity for snapshot
+            event_data = {
+                "camera_entity": self.camera_entity,  # Use configured camera entity for snapshot
+                "trigger_entity": entity_id,
+                "new_state": new_state.state,
+                "old_state": old_state.state,
+                "attributes": new_state.attributes,
+                "timestamp": dt_util.utcnow().isoformat()
+            }
+
+            # Schedule callback execution
+            self.hass.async_create_task(self._callback(event_data))
 
     @callback
     def _handle_camera_state_change(self, event: Event) -> None:
