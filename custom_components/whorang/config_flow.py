@@ -487,10 +487,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     options=new_options
                 )
                 
-                # Trigger coordinator refresh if available
-                if DOMAIN in self.hass.data and self.config_entry.entry_id in self.hass.data[DOMAIN]:
-                    coordinator = self.hass.data[DOMAIN][self.config_entry.entry_id]
-                    await coordinator.async_request_refresh()
+                _LOGGER.info("Successfully updated WhoRang configuration")
+                _LOGGER.debug("New options saved: %s", new_options)
+                
+                # Don't trigger coordinator refresh immediately to avoid connection issues
+                # The coordinator will pick up the new config on next update cycle
                 
                 return self.async_create_entry(title="", data={})
         
