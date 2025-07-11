@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 import voluptuous as vol
@@ -165,8 +165,33 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Update options."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Update options without reloading the entire integration."""
+    _LOGGER.info("Updating WhoRang options: %s", entry.options)
+    
+    # Get the coordinator for this entry
+    coordinator = hass.data[DOMAIN].get(entry.entry_id)
+    if coordinator and isinstance(coordinator, WhoRangDataUpdateCoordinator):
+        # Update coordinator settings based on new options
+        update_interval = entry.options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+        enable_websocket = entry.options.get(CONF_ENABLE_WEBSOCKET, True)
+        
+        # Update coordinator update interval if changed
+        if coordinator.update_interval.total_seconds() != update_interval:
+            coordinator.update_interval = timedelta(seconds=update_interval)
+            _LOGGER.info("Updated coordinator update interval to %s seconds", update_interval)
+        
+        # Log the intelligent automation settings for debugging
+        automation_config = entry.options.get("intelligent_automation", {})
+        ai_template = automation_config.get("ai_prompt_template", "professional")
+        _LOGGER.info("Updated AI prompt template to: %s", ai_template)
+        _LOGGER.info("Full automation config: %s", automation_config)
+        
+        # Trigger a coordinator refresh to apply new settings
+        await coordinator.async_request_refresh()
+        _LOGGER.info("Options updated successfully without reloading integration")
+    else:
+        _LOGGER.warning("Coordinator not found for entry %s, falling back to reload", entry.entry_id)
+        await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
