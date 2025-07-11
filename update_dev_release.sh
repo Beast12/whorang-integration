@@ -162,8 +162,7 @@ Simply **reinstall the same version** (v1.1.0-dev) to get updates during develop
 This release represents a revolutionary step forward in doorbell automation, providing users with enterprise-grade intelligence without complexity.
 
 **Transform your doorbell from simple monitoring to intelligent automation!** 🚀" \
-    --prerelease \
-    --latest=false
+    --prerelease
 
 echo ""
 echo "🎉 SUCCESS! Development release v1.1.0-dev updated!"

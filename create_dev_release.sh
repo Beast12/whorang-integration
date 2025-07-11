@@ -88,9 +88,9 @@ git commit -m "feat: Intelligent Notification System v1.1.0-dev
 BREAKING: This is a development release for testing new features.
 Users should backup before installing and can return to v1.0.0 stable."
 
-# Create the development tag
+# Create the development tag (force if exists)
 echo "🏷️  Creating v1.1.0-dev tag..."
-git tag -a v1.1.0-dev -m "Development Release: WhoRang Intelligent Notification System v1.1.0-dev
+git tag -f -a v1.1.0-dev -m "Development Release: WhoRang Intelligent Notification System v1.1.0-dev
 
 🎯 ZERO-CONFIGURATION INTELLIGENT AUTOMATION
 
@@ -156,7 +156,7 @@ echo "⬆️  Pushing to remote repository..."
 git push origin main
 
 echo "🏷️  Pushing development tag..."
-git push origin v1.1.0-dev
+git push -f origin v1.1.0-dev
 
 # Create GitHub release
 echo "🚀 Creating GitHub release..."
@@ -250,8 +250,7 @@ Simply **reinstall the same version** (v1.1.0-dev) to get updates during develop
 This release represents a revolutionary step forward in doorbell automation, providing users with enterprise-grade intelligence without complexity.
 
 **Transform your doorbell from simple monitoring to intelligent automation!** 🚀" \
-    --prerelease \
-    --latest=false
+    --prerelease
 
 echo ""
 echo "🎉 SUCCESS! Development release v1.1.0-dev created!"
