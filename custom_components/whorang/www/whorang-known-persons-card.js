@@ -8,6 +8,11 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
     this.persons = [];
+    this.totalKnown = 0;
+    this.totalFaces = 0;
+    this.avgFaces = 0;
+    this.galleryReady = true; // Default to true so we show empty state immediately
+    this.backendUrl = null;
     this.isLoading = false;
     this.loadingTimeout = null;
     this.loadingStartTime = null;
@@ -399,8 +404,8 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     const statsSummary = this.shadowRoot.getElementById('stats-summary');
     const controls = this.shadowRoot.getElementById('controls');
     
-    // Update stats display - always show count, never show loading
-    if (this.config.show_stats && this.galleryReady) {
+    // Always show count, never show loading - remove galleryReady check
+    if (this.config.show_stats && this.totalKnown > 0) {
       statsSummary.style.display = 'grid';
       statsInfo.textContent = `${this.totalKnown || 0} persons, ${this.totalFaces || 0} faces`;
       
