@@ -20,23 +20,6 @@ CONF_OLLAMA_HOST: Final = "ollama_host"
 CONF_OLLAMA_PORT: Final = "ollama_port"
 CONF_OLLAMA_ENABLED: Final = "ollama_enabled"
 
-# Intelligent Automation Configuration
-CONF_ENABLE_INTELLIGENT_AUTOMATION: Final = "enable_intelligent_automation"
-CONF_CAMERA_ENTITY: Final = "camera_entity"
-CONF_CAMERA_MONITOR_MODE: Final = "camera_monitor_mode"
-CONF_AI_PROMPT_TEMPLATE: Final = "ai_prompt_template"
-CONF_CUSTOM_AI_PROMPT: Final = "custom_ai_prompt"
-CONF_ENABLE_NOTIFICATIONS: Final = "enable_notifications"
-CONF_NOTIFICATION_DEVICES: Final = "notification_devices"
-CONF_NOTIFICATION_TEMPLATE: Final = "notification_template"
-CONF_ENABLE_MEDIA: Final = "enable_media"
-CONF_DOORBELL_SOUND_FILE: Final = "doorbell_sound_file"
-CONF_TTS_SERVICE: Final = "tts_service"
-CONF_MEDIA_PLAYERS: Final = "media_players"
-CONF_DISPLAY_PLAYERS: Final = "display_players"
-CONF_DISPLAY_DURATION: Final = "display_duration"
-CONF_ENABLE_WEATHER_CONTEXT: Final = "enable_weather_context"
-CONF_WEATHER_ENTITY: Final = "weather_entity"
 
 # Default values
 DEFAULT_PORT: Final = 3001
@@ -198,14 +181,6 @@ SERVICE_GET_UNKNOWN_FACES: Final = "get_unknown_faces"
 SERVICE_DELETE_FACE: Final = "delete_face"
 SERVICE_GET_FACE_SIMILARITIES: Final = "get_face_similarities"
 
-# Intelligent Automation Services (HA 2025+ Compatible)
-SERVICE_SETUP_CAMERA_AUTOMATION: Final = "setup_camera_automation"
-SERVICE_START_INTELLIGENT_MONITORING: Final = "start_intelligent_monitoring"
-SERVICE_STOP_INTELLIGENT_MONITORING: Final = "stop_intelligent_monitoring"
-SERVICE_INTELLIGENT_NOTIFY: Final = "intelligent_notify"
-SERVICE_PLAY_DOORBELL_SEQUENCE: Final = "play_doorbell_sequence"
-SERVICE_CONFIGURE_AI_PROMPT: Final = "configure_ai_prompt"
-SERVICE_TEST_NOTIFICATION_TEMPLATE: Final = "test_notification_template"
 
 # WebSocket message types
 WS_TYPE_NEW_VISITOR: Final = "new_visitor"
