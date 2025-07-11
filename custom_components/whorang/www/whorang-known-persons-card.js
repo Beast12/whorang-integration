@@ -1469,17 +1469,39 @@ class WhoRangKnownPersonsCard extends HTMLElement {
             
             if (facesResult && Array.isArray(facesResult.faces)) {
               workingBaseUrl = baseUrl;
-              facesData = facesResult.faces.map(face => ({
-                id: face.id,
-                image_url: face.face_crop_path ? `${baseUrl}/${face.face_crop_path.replace(/^\/+/, '')}` : 
-                          face.thumbnail_path ? `${baseUrl}/${face.thumbnail_path.replace(/^\/+/, '')}` :
-                          `${baseUrl}/api/faces/${face.id}/image`,
-                quality_score: face.quality_score || 0,
-                detection_date: face.created_at,
-                confidence: face.confidence || 0,
-                original_image: face.original_image
-              }));
-              console.log(`Found ${facesData.length} faces for person ${personId}`);
+              facesData = facesResult.faces.map(face => {
+                // Try multiple image URL patterns for better compatibility
+                let imageUrl;
+                if (face.face_crop_path) {
+                  // Handle both absolute and relative paths
+                  if (face.face_crop_path.startsWith('http')) {
+                    imageUrl = face.face_crop_path;
+                  } else {
+                    imageUrl = `${baseUrl}/${face.face_crop_path.replace(/^\/+/, '')}`;
+                  }
+                } else if (face.thumbnail_path) {
+                  if (face.thumbnail_path.startsWith('http')) {
+                    imageUrl = face.thumbnail_path;
+                  } else {
+                    imageUrl = `${baseUrl}/${face.thumbnail_path.replace(/^\/+/, '')}`;
+                  }
+                } else {
+                  // Fallback to API endpoint
+                  imageUrl = `${baseUrl}/api/faces/${face.id}/image`;
+                }
+                
+                console.log(`Face ${face.id} image URL: ${imageUrl}`);
+                
+                return {
+                  id: face.id,
+                  image_url: imageUrl,
+                  quality_score: face.quality_score || 0,
+                  detection_date: face.created_at,
+                  confidence: face.confidence || 0,
+                  original_image: face.original_image
+                };
+              });
+              console.log(`Found ${facesData.length} faces for person ${personId}:`, facesData);
               break;
             }
           } else {
@@ -1533,7 +1555,12 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     // Create a simple faces viewer dialog
     const facesHtml = faces.map(face => `
       <div class="face-item">
-        <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" />
+        <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" 
+             onerror="console.error('Face image failed to load: ${face.image_url}'); this.style.display='none'; this.nextElementSibling.style.display='block';"
+             onload="console.log('Face image loaded successfully: ${face.image_url}');" />
+        <div style="display: none; padding: 20px; text-align: center; color: #999; border: 2px dashed #ccc; border-radius: 8px;">
+          Image failed to load
+        </div>
         <div class="face-info">
           <div>Quality: ${Math.round((face.quality_score || 0) * 100)}%</div>
           <div>Detected: ${new Date(face.detection_date).toLocaleDateString()}</div>
