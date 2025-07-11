@@ -44,8 +44,7 @@ jobs:
 
       - name: Check version consistency
         run: |
-          MANIFEST_VERSION=$(grep '"version"' \
-            custom_components/whorang/manifest.json | \
+          MANIFEST_VERSION=$(grep '"version"' custom_components/whorang/manifest.json | \
             sed 's/.*"version": "\(.*\)".*/\1/')
           
           if ! grep -q "\[$MANIFEST_VERSION\]" CHANGELOG.md; then
@@ -69,7 +68,8 @@ jobs:
       - name: Extract version from manifest
         id: version
         run: |
-          VERSION=$(grep '"version"' custom_components/whorang/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
+          VERSION=$(grep '"version"' custom_components/whorang/manifest.json | \
+            sed 's/.*"version": "\(.*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
@@ -231,13 +231,13 @@ jobs:
           
           - **[WhoRang Backend](https://github.com/Beast12/whorang-addon)**: AI processing backend system
           - **[Docker Images](https://ghcr.io/beast12/whorang-backend)**: Ready-to-use containers
-          - **[Documentation](https://github.com/Beast12/whorang-integration/tree/main/docs)**: Complete guides and examples
+          - **[Documentation](https://github.com/Beast12/whorang-integration/tree/main/docs)**: Complete guides
           
           ---
           
           ## 🐛 Issues & Support
           
-          - **[Report Issues](https://github.com/Beast12/whorang-integration/issues)**: Bug reports and feature requests
+          - **[Report Issues](https://github.com/Beast12/whorang-integration/issues)**: Bug reports and requests
           - **[Discussions](https://github.com/Beast12/whorang-integration/discussions)**: Community support
           - **[HACS](https://hacs.xyz/)**: Home Assistant Community Store
           
@@ -249,7 +249,7 @@ jobs:
           
           ---
           
-          **Transform your doorbell into an intelligent AI-powered security system with seamless Home Assistant integration!**
+          **Transform your doorbell into an intelligent AI-powered security system with Home Assistant integration!**
           EOF
 
       - name: Create Release
