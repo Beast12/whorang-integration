@@ -1,0 +1,297 @@
+---
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    name: Pre-Release Validation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master
+
+      - name: Validate HACS JSON
+        run: |
+          python -c "
+          import json
+          
+          # Load HACS manifest
+          with open('hacs.json') as f:
+              hacs_manifest = json.load(f)
+          
+          # Check required fields
+          required_fields = ['name', 'content_in_root', 'filename', 'homeassistant']
+          for field in required_fields:
+              if field not in hacs_manifest:
+                  raise ValueError(f'Missing required field: {field}')
+          
+          print('✅ HACS JSON validation passed')
+          "
+
+      - name: Check version consistency
+        run: |
+          MANIFEST_VERSION=$(grep '"version"' \
+            custom_components/whorang/manifest.json | \
+            sed 's/.*"version": "\(.*\)".*/\1/')
+          
+          if ! grep -q "\[$MANIFEST_VERSION\]" CHANGELOG.md; then
+            echo "❌ Version $MANIFEST_VERSION not found in CHANGELOG.md"
+            exit 1
+          fi
+          
+          echo "✅ Version consistency check passed: $MANIFEST_VERSION"
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from manifest
+        id: version
+        run: |
+          VERSION=$(grep '"version"' custom_components/whorang/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Extract changelog section for this version
+          CHANGELOG_CONTENT=$(awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md || echo "See CHANGELOG.md for details.")
+          
+          # Save to file for multiline output
+          echo "$CHANGELOG_CONTENT" > changelog_excerpt.md
+          
+          # Set output
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          cat changelog_excerpt.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release Archive
+        run: |
+          # Create a clean archive of the integration
+          mkdir -p release/custom_components
+          cp -r custom_components/whorang release/custom_components/
+          
+          # Remove any cache files
+          find release -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          find release -name "*.pyc" -delete 2>/dev/null || true
+          
+          # Create archive
+          cd release
+          zip -r ../whorang-integration-${{ steps.version.outputs.version }}.zip custom_components/
+          cd ..
+          
+          # Verify archive contents
+          echo "📦 Archive contents:"
+          unzip -l whorang-integration-${{ steps.version.outputs.version }}.zip
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          # 🏠 WhoRang Home Assistant Integration ${{ steps.version.outputs.tag }}
+          
+          **Complete Home Assistant Integration for WhoRang AI Doorbell System**
+          
+          ---
+          
+          ## 🚀 Installation
+          
+          ### Via HACS (Recommended)
+          1. Open HACS in Home Assistant
+          2. Go to "Integrations"
+          3. Click the three dots in the top right corner
+          4. Select "Custom repositories"
+          5. Add `https://github.com/Beast12/whorang-integration` as an Integration
+          6. Search for "WhoRang" and install
+          
+          ### Manual Installation
+          1. Download the `whorang-integration-${{ steps.version.outputs.version }}.zip` file
+          2. Extract to your `custom_components` directory
+          3. Restart Home Assistant
+          4. Add the integration via Settings → Devices & Services
+          
+          ---
+          
+          ## ✨ Features
+          
+          ### 🏠 Home Assistant Native Integration
+          - **19+ Sensors & Binary Sensors**: Comprehensive monitoring entities
+          - **Custom Lovelace Cards**: Face management and gallery interfaces
+          - **Real-time Updates**: WebSocket integration for live data
+          - **Service Calls**: Complete automation support
+          - **HACS Compatible**: Easy installation and updates
+          
+          ### 👤 Face Management
+          - **Interactive Face Gallery**: Visual person management
+          - **Face Labeling Interface**: Easy person identification
+          - **Person CRUD Operations**: Complete person management
+          - **Avatar Generation**: Automatic person avatars
+          - **Batch Operations**: Efficient face processing
+          
+          ### 📊 Monitoring & Analytics
+          - **AI Cost Tracking**: Real-time usage monitoring
+          - **Performance Metrics**: System health and statistics
+          - **Analysis Status**: Live processing updates
+          - **Provider Switching**: Dynamic AI provider selection
+          - **Model Management**: AI model configuration
+          
+          ### 🎯 Automation Support
+          - **Rich Events**: Comprehensive event system
+          - **Service Integration**: Full Home Assistant service support
+          - **Webhook Processing**: Doorbell event automation
+          - **Weather Integration**: Contextual analysis data
+          - **Custom Triggers**: Advanced automation capabilities
+          
+          ---
+          
+          ## 📋 What's New in ${{ steps.version.outputs.version }}
+          
+          ${{ steps.changelog.outputs.content }}
+          
+          ---
+          
+          ## 🔧 Configuration
+          
+          After installation, add the integration via:
+          **Settings → Devices & Services → Add Integration → WhoRang**
+          
+          ### Required Configuration
+          - **Host**: WhoRang backend server IP/hostname
+          - **Port**: Backend server port (default: 3001)
+          - **API Key**: Optional authentication key
+          
+          ### Optional Configuration
+          - **Update Interval**: Data refresh frequency
+          - **WebSocket**: Enable real-time updates
+          - **Cost Tracking**: Monitor AI usage costs
+          - **Ollama Integration**: Local AI processing
+          
+          ---
+          
+          ## 📚 Documentation
+          
+          - **[Installation Guide](docs/installation/hacs-installation.md)**: Detailed setup instructions
+          - **[Configuration Guide](docs/configuration/initial-setup.md)**: Complete configuration options
+          - **[Dashboard Examples](docs/usage/dashboard-examples.md)**: Lovelace card configurations
+          - **[Face Management](docs/usage/face-management-guide.md)**: Person and face management
+          - **[Automation Examples](docs/automation/basic-automations.md)**: Home Assistant automations
+          - **[Troubleshooting](docs/troubleshooting/common-issues.md)**: Common issues and solutions
+          
+          ---
+          
+          ## 🎨 Custom Cards
+          
+          This integration includes custom Lovelace cards:
+          
+          ### WhoRang Known Persons Card
+          ```yaml
+          type: custom:whorang-known-persons-card
+          entity: sensor.whorang_known_persons
+          title: "Known Persons"
+          show_avatars: true
+          max_persons: 10
+          ```
+          
+          ### WhoRang Face Manager Card
+          ```yaml
+          type: custom:whorang-face-manager
+          entity: sensor.whorang_unknown_faces
+          title: "Face Management"
+          show_similarity: true
+          batch_mode: true
+          ```
+          
+          ---
+          
+          ## 🔗 Related Projects
+          
+          - **[WhoRang Backend](https://github.com/Beast12/whorang-addon)**: AI processing backend system
+          - **[Docker Images](https://ghcr.io/beast12/whorang-backend)**: Ready-to-use containers
+          - **[Documentation](https://github.com/Beast12/whorang-integration/tree/main/docs)**: Complete guides and examples
+          
+          ---
+          
+          ## 🐛 Issues & Support
+          
+          - **[Report Issues](https://github.com/Beast12/whorang-integration/issues)**: Bug reports and feature requests
+          - **[Discussions](https://github.com/Beast12/whorang-integration/discussions)**: Community support
+          - **[HACS](https://hacs.xyz/)**: Home Assistant Community Store
+          
+          ---
+          
+          ## 🙏 Acknowledgments
+          
+          Special thanks to the Home Assistant community and HACS for making custom integrations accessible to everyone.
+          
+          ---
+          
+          **Transform your doorbell into an intelligent AI-powered security system with seamless Home Assistant integration!**
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: WhoRang Home Assistant Integration ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          files: |
+            whorang-integration-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update HACS Repository
+        run: |
+          echo "🎉 Release ${{ steps.version.outputs.tag }} created successfully!"
+          echo "📦 Archive: whorang-integration-${{ steps.version.outputs.version }}.zip"
+          echo "🏠 HACS users will be notified of the update automatically"
+          echo "📚 Documentation: https://github.com/Beast12/whorang-integration"
+
+  notify-success:
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: success()
+    steps:
+      - name: Success Notification
+        run: |
+          echo "✅ WhoRang Integration release completed successfully!"
+          echo "🏠 Home Assistant users can now update via HACS"
+          echo "📦 Manual installation archive is available in the release"
+          echo "📚 Documentation has been updated"
+
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [validate, create-release]
+    if: failure()
+    steps:
+      - name: Failure Notification
+        run: |
+          echo "❌ WhoRang Integration release failed!"
+          echo "🔍 Check the workflow logs for details"
+          echo "🛠️ Fix any validation issues and try again"
