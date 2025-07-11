@@ -1471,30 +1471,45 @@ class WhoRangKnownPersonsCard extends HTMLElement {
               workingBaseUrl = baseUrl;
               facesData = facesResult.faces.map(face => {
                 // Try multiple image URL patterns for better compatibility
-                let imageUrl;
+                let imageUrls = [];
+                
+                // Build multiple URL candidates to try
                 if (face.face_crop_path) {
-                  // Handle both absolute and relative paths
                   if (face.face_crop_path.startsWith('http')) {
-                    imageUrl = face.face_crop_path;
+                    imageUrls.push(face.face_crop_path);
                   } else {
-                    imageUrl = `${baseUrl}/${face.face_crop_path.replace(/^\/+/, '')}`;
+                    // Try multiple path patterns
+                    const cleanPath = face.face_crop_path.replace(/^\/+/, '');
+                    imageUrls.push(`${baseUrl}/${cleanPath}`);
+                    imageUrls.push(`${baseUrl}/data/${cleanPath}`);
+                    imageUrls.push(`${baseUrl}/${face.face_crop_path}`); // Original path as-is
                   }
-                } else if (face.thumbnail_path) {
-                  if (face.thumbnail_path.startsWith('http')) {
-                    imageUrl = face.thumbnail_path;
-                  } else {
-                    imageUrl = `${baseUrl}/${face.thumbnail_path.replace(/^\/+/, '')}`;
-                  }
-                } else {
-                  // Fallback to API endpoint
-                  imageUrl = `${baseUrl}/api/faces/${face.id}/image`;
                 }
                 
-                console.log(`Face ${face.id} image URL: ${imageUrl}`);
+                if (face.thumbnail_path) {
+                  if (face.thumbnail_path.startsWith('http')) {
+                    imageUrls.push(face.thumbnail_path);
+                  } else {
+                    const cleanPath = face.thumbnail_path.replace(/^\/+/, '');
+                    imageUrls.push(`${baseUrl}/${cleanPath}`);
+                    imageUrls.push(`${baseUrl}/data/${cleanPath}`);
+                    imageUrls.push(`${baseUrl}/${face.thumbnail_path}`); // Original path as-is
+                  }
+                }
+                
+                // Always add API endpoint as fallback
+                imageUrls.push(`${baseUrl}/api/faces/${face.id}/image`);
+                
+                // Use the first URL as primary, but store all for fallback
+                const primaryImageUrl = imageUrls[0] || `${baseUrl}/api/faces/${face.id}/image`;
+                
+                console.log(`Face ${face.id} image URL candidates:`, imageUrls);
+                console.log(`Face ${face.id} primary image URL: ${primaryImageUrl}`);
                 
                 return {
                   id: face.id,
-                  image_url: imageUrl,
+                  image_url: primaryImageUrl,
+                  image_url_candidates: imageUrls, // Store all candidates for fallback
                   quality_score: face.quality_score || 0,
                   detection_date: face.created_at,
                   confidence: face.confidence || 0,
@@ -1552,21 +1567,27 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   }
 
   showPersonFacesDialog(personId, faces) {
-    // Create a simple faces viewer dialog
-    const facesHtml = faces.map(face => `
-      <div class="face-item">
-        <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" 
-             onerror="console.error('Face image failed to load: ${face.image_url}'); this.style.display='none'; this.nextElementSibling.style.display='block';"
-             onload="console.log('Face image loaded successfully: ${face.image_url}');" />
-        <div style="display: none; padding: 20px; text-align: center; color: #999; border: 2px dashed #ccc; border-radius: 8px;">
-          Image failed to load
+    // Create a simple faces viewer dialog with smart fallback
+    const facesHtml = faces.map(face => {
+      const candidatesJson = JSON.stringify(face.image_url_candidates || [face.image_url]).replace(/"/g, '&quot;');
+      return `
+        <div class="face-item" data-face-id="${face.id}">
+          <img src="${face.image_url}" alt="Face ${face.id}" class="face-thumbnail" 
+               data-candidates="${candidatesJson}"
+               data-current-index="0"
+               onerror="this.parentElement.parentElement.tryNextImageUrl(this);"
+               onload="console.log('Face image loaded successfully: ${face.image_url}');" />
+          <div style="display: none; padding: 20px; text-align: center; color: #999; border: 2px dashed #ccc; border-radius: 8px;">
+            Image failed to load<br>
+            <small>Tried all ${(face.image_url_candidates || [face.image_url]).length} URLs</small>
+          </div>
+          <div class="face-info">
+            <div>Quality: ${Math.round((face.quality_score || 0) * 100)}%</div>
+            <div>Detected: ${new Date(face.detection_date).toLocaleDateString()}</div>
+          </div>
         </div>
-        <div class="face-info">
-          <div>Quality: ${Math.round((face.quality_score || 0) * 100)}%</div>
-          <div>Detected: ${new Date(face.detection_date).toLocaleDateString()}</div>
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
     
     const dialog = document.createElement('div');
     dialog.className = 'faces-dialog';
@@ -1595,6 +1616,28 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     
     closeBtn.addEventListener('click', closeDialog);
     backdrop.addEventListener('click', closeDialog);
+    
+    // Add fallback URL functionality to the dialog
+    dialog.tryNextImageUrl = (imgElement) => {
+      const candidates = JSON.parse(imgElement.getAttribute('data-candidates') || '[]');
+      let currentIndex = parseInt(imgElement.getAttribute('data-current-index') || '0');
+      
+      console.error(`Face image failed to load: ${imgElement.src}`);
+      
+      // Try next URL
+      currentIndex++;
+      if (currentIndex < candidates.length) {
+        const nextUrl = candidates[currentIndex];
+        console.log(`Trying next face image URL (${currentIndex + 1}/${candidates.length}): ${nextUrl}`);
+        imgElement.setAttribute('data-current-index', currentIndex.toString());
+        imgElement.src = nextUrl;
+      } else {
+        // All URLs failed, show error message
+        console.error(`All ${candidates.length} face image URLs failed for face`);
+        imgElement.style.display = 'none';
+        imgElement.nextElementSibling.style.display = 'block';
+      }
+    };
   }
 
   async deletePerson(personId) {
