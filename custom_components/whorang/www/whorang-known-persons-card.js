@@ -9,6 +9,8 @@ class WhoRangKnownPersonsCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.persons = [];
     this.isLoading = false;
+    this.loadingTimeout = null;
+    this.loadingStartTime = null;
   }
 
   setConfig(config) {
@@ -39,11 +41,33 @@ class WhoRangKnownPersonsCard extends HTMLElement {
       const totalKnown = gallery.attributes.total_known_persons || 0;
       const totalFaces = gallery.attributes.total_labeled_faces || 0;
       const avgFaces = gallery.attributes.avg_faces_per_person || 0;
-      const galleryReady = gallery.attributes.gallery_ready || false;
+      const galleryReady = gallery.attributes.gallery_ready;
       const backendUrl = gallery.attributes.backend_url || this.config.whorang_url;
       
+      // Set up timeout for loading state if gallery is not ready and we haven't started timing yet
+      if (galleryReady === undefined && !this.loadingStartTime) {
+        this.loadingStartTime = Date.now();
+        this.loadingTimeout = setTimeout(() => {
+          console.warn('WhoRang Known Persons Card: Loading timeout reached, forcing empty state display');
+          if (this.galleryReady === undefined) {
+            this.galleryReady = true; // Force show empty state
+            this.totalKnown = 0;
+            this.totalFaces = 0;
+            this.renderContent();
+          }
+        }, 30000); // 30 second timeout
+      }
+      
+      // Clear timeout if we get definitive data
+      if (galleryReady !== undefined && this.loadingTimeout) {
+        clearTimeout(this.loadingTimeout);
+        this.loadingTimeout = null;
+        this.loadingStartTime = null;
+      }
+      
       // Only update if data has changed
-      if (JSON.stringify(this.persons) !== JSON.stringify(persons)) {
+      if (JSON.stringify(this.persons) !== JSON.stringify(persons) || 
+          this.galleryReady !== galleryReady) {
         this.persons = persons;
         this.totalKnown = totalKnown;
         this.totalFaces = totalFaces;
@@ -501,25 +525,46 @@ class WhoRangKnownPersonsCard extends HTMLElement {
   renderPersonsGrid() {
     const grid = this.shadowRoot.getElementById('persons-grid');
     
-    if (!this.galleryReady) {
-      grid.innerHTML = `
-        <div class="loading-state" style="grid-column: 1 / -1;">
-          <div class="avatar-loading" style="margin: 0 auto 16px;"></div>
-          <div>Loading known persons...</div>
-        </div>
-      `;
-      return;
+    // Check if we have any persons data at all
+    if (this.persons.length === 0) {
+      // Show empty state if we have confirmed no persons OR if gallery is explicitly ready
+      if (this.galleryReady === true || 
+          (this.galleryReady === false && this.totalKnown === 0) ||
+          (this.totalKnown === 0 && this.totalFaces === 0)) {
+        // We have confirmed data showing no persons
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="icon">👥</div>
+            <div>No known persons yet</div>
+            <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
+          </div>
+        `;
+        return;
+      } else if (this.galleryReady === undefined || this.galleryReady === null) {
+        // Still loading - show loading state
+        grid.innerHTML = `
+          <div class="loading-state" style="grid-column: 1 / -1;">
+            <div class="avatar-loading" style="margin: 0 auto 16px;"></div>
+            <div>Loading known persons...</div>
+          </div>
+        `;
+        return;
+      } else {
+        // Gallery not ready but we have some indication of state
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="icon">👥</div>
+            <div>No known persons yet</div>
+            <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
+          </div>
+        `;
+        return;
+      }
     }
     
-    if (this.persons.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-state" style="grid-column: 1 / -1;">
-          <div class="icon">👥</div>
-          <div>No known persons yet</div>
-          <div style="margin-top: 8px; font-size: 0.9em;">Start labeling faces to build your person gallery.</div>
-        </div>
-      `;
-      return;
+    // If we have persons but gallery not ready, still show them
+    if (!this.galleryReady && this.persons.length > 0) {
+      // Continue to render persons even if gallery not fully ready
     }
     
     grid.innerHTML = '';

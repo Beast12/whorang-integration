@@ -988,18 +988,33 @@ class WhoRangKnownPersonsGallerySensor(WhoRangSensorEntity):
                         "last_updated": gallery_data.get("last_updated")
                     }
                 else:
-                    # Gallery data exists but not ready (error state)
-                    error = gallery_data.get("error", "Unknown error")
-                    return {
-                        "persons": [],
-                        "total_known_persons": 0,
-                        "total_labeled_faces": 0,
-                        "avg_faces_per_person": 0,
-                        "gallery_ready": False,
-                        "error": error,
-                        "backend_url": self.coordinator.api_client.base_url,
-                        "last_updated": gallery_data.get("last_updated")
-                    }
+                    # Gallery data exists but not ready - check if it's an empty result vs error
+                    error = gallery_data.get("error")
+                    known_persons = gallery_data.get("known_persons", [])
+                    
+                    # If we have an empty list but no error, treat as ready with empty data
+                    if not error and isinstance(known_persons, list) and len(known_persons) == 0:
+                        return {
+                            "persons": [],
+                            "total_known_persons": 0,
+                            "total_labeled_faces": 0,
+                            "avg_faces_per_person": 0,
+                            "gallery_ready": True,  # Set to True for empty but valid result
+                            "backend_url": self.coordinator.api_client.base_url,
+                            "last_updated": gallery_data.get("last_updated")
+                        }
+                    else:
+                        # Actual error state
+                        return {
+                            "persons": [],
+                            "total_known_persons": 0,
+                            "total_labeled_faces": 0,
+                            "avg_faces_per_person": 0,
+                            "gallery_ready": False,
+                            "error": error or "Gallery not ready",
+                            "backend_url": self.coordinator.api_client.base_url,
+                            "last_updated": gallery_data.get("last_updated")
+                        }
             else:
                 # Fallback to basic known persons data
                 known_persons = self.coordinator.async_get_known_persons()
@@ -1018,14 +1033,17 @@ class WhoRangKnownPersonsGallerySensor(WhoRangSensorEntity):
                     }
                     processed_persons.append(processed_person)
                 
+                # If we successfully got known persons data (even if empty), mark as ready
+                gallery_ready = True  # We have definitive data from the coordinator
+                
                 return {
                     "persons": processed_persons,
                     "total_known_persons": len(processed_persons),
                     "total_labeled_faces": sum(p.get("face_count", 0) for p in processed_persons),
                     "avg_faces_per_person": 0,
-                    "gallery_ready": False,
+                    "gallery_ready": gallery_ready,
                     "backend_url": self.coordinator.api_client.base_url,
-                    "fetch_instruction": "Waiting for coordinator to load face gallery data..."
+                    "fetch_instruction": "Using fallback known persons data" if len(processed_persons) == 0 else None
                 }
                 
         except Exception as e:
@@ -1035,7 +1053,7 @@ class WhoRangKnownPersonsGallerySensor(WhoRangSensorEntity):
                 "total_known_persons": 0,
                 "total_labeled_faces": 0,
                 "avg_faces_per_person": 0,
-                "gallery_ready": False,
+                "gallery_ready": True,  # Set to True so card can show empty state instead of loading forever
                 "backend_url": self.coordinator.api_client.base_url,
                 "error": str(e)
             }
