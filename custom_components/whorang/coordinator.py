@@ -882,8 +882,31 @@ class WhoRangDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.error("Image URL is required for doorbell event")
                 return False
             
-            # Send event to backend API first
-            success = await self.api_client.process_doorbell_event(event_data)
+            # Extract AI template configuration from automation_config
+            automation_config = event_data.get("automation_config", {})
+            ai_template_config = {}
+            
+            if automation_config:
+                ai_template_config = {
+                    "ai_prompt_template": automation_config.get("ai_prompt_template", "professional"),
+                    "custom_ai_prompt": automation_config.get("custom_ai_prompt", ""),
+                    "enable_weather_context": automation_config.get("enable_weather_context", True)
+                }
+                _LOGGER.info("🎯 Using AI template from HA config: %s", ai_template_config.get("ai_prompt_template"))
+            else:
+                _LOGGER.warning("No automation config found, using default professional template")
+                ai_template_config = {
+                    "ai_prompt_template": "professional",
+                    "custom_ai_prompt": "",
+                    "enable_weather_context": True
+                }
+            
+            # Create enhanced event data with AI template configuration
+            enhanced_event_data = event_data.copy()
+            enhanced_event_data.update(ai_template_config)
+            
+            # Send event to backend API with AI template configuration
+            success = await self.api_client.process_doorbell_event(enhanced_event_data)
             
             if not success:
                 _LOGGER.error("Backend failed to process doorbell event")
